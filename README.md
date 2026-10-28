@@ -9,17 +9,16 @@ It needs no server at home or Home Assistant: it runs on a free Vercel account, 
 ## Setting it up
 
 1. **Click "Deploy with Vercel"** (above). Vercel makes a copy of the repo in your GitHub and deploys it; there's nothing to fill in.
-2. When it's done, Vercel gives you an address like `https://marco-familiar-xxxx.vercel.app`. **Open it in Safari on the iPad.**
-3. **Add it to the Home Screen** (Share → "Add to Home Screen") and open it from there. It then runs full screen, with no Safari bars.
-   > Do it in this order: on iPad, the Home Screen app doesn't share data with Safari, so the wizard has to be filled in from the app.
-4. **Follow the wizard.** It takes a few minutes:
+2. When it's done, Vercel gives you an address like `https://marco-familiar-xxxx.vercel.app`. **Open it on your computer** and follow the wizard. It takes a few minutes:
    - Location: for the weather and the nearby petrol stations.
    - Google calendars (see below).
    - Optional cards: countdown, football, petrol, electricity and Talentos.
+3. The last step shows a **QR code**. Scan it with the iPad's camera (or send yourself the link) and open it in Safari.
+4. On the iPad: Share → **"Add to Home Screen"**, and open it from there. It runs full screen, with no Safari bars.
 5. On the iPad: **Settings → Display & Brightness → Auto-Lock → Never**, and leave it on charge.
 
 To change something later, tap **⚙︎** in the bottom-right corner.
-To set up a second iPad the same way, the wizard's last step gives you a code to paste into the other one.
+To set up a second iPad, open the same link (⚙︎ → last step shows the QR again).
 
 ### Google Calendar's secret address
 
@@ -46,7 +45,7 @@ New events can take a few minutes to show up, because Google takes a while to up
 
 ## Privacy
 
-- **Settings live only on the iPad** (in the browser's local storage): calendar addresses and location (rounded to ~1 km). They are never written to the repo or to Vercel.
+- **Settings travel inside the link** (after `#`, a part browsers never send to the server) and are kept in the browser's local storage: calendar addresses and location (rounded to ~1 km). They are never written to the repo or to Vercel. The link contains your calendar addresses, so share it only with your family.
 - The only server-side function, `api/proxy.js`, reads the calendars and the Talentos board on the iPad's behalf, because browsers don't allow reading them directly. It only talks to Google Calendar, Talentos and ESPN and stores nothing, so it doesn't need a password: anyone using it can only read what they already have the address or code for.
 
 ## Development

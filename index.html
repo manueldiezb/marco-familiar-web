@@ -324,6 +324,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 <div id="status"></div>
 <button id="gear" onclick="openSetup()" aria-label="Ajustes">⚙︎</button>
 <div id="setup" hidden><div class="w"></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="logica.js"></script>
 <script>
 const DOW = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -352,11 +353,13 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch {} },
 };
 
-// --- Configuración: vive solo en este iPad (localStorage). Un enlace con #cfg=<código> la importa ---
+// --- Configuración: va en el propio enlace (#cfg=<código>) y se copia en localStorage.
+// Así se configura en el ordenador y el iPad solo abre el enlace; y «Añadir a pantalla de inicio» se lleva la configuración.
+// Un enlace ya aplicado (marco_imp) no pisa lo que se cambie después con ⚙︎ en ese aparato.
 let cfg = null;
 (() => {
-  const h = location.hash.match(/^#cfg=(.+)$/), imp = h && decodificar(decodeURIComponent(h[1]));
-  if (imp?.lat != null) { store.set('marco_cfg', JSON.stringify(imp)); history.replaceState(null, '', location.pathname); }
+  const h = location.hash.match(/^#cfg=(.+)$/), code = h && decodeURIComponent(h[1]), imp = code && decodificar(code);
+  if (imp?.lat != null && code !== store.get('marco_imp')) { store.set('marco_cfg', JSON.stringify(imp)); store.set('marco_imp', code); }
   try { cfg = JSON.parse(store.get('marco_cfg') || 'null'); } catch {}
 })();
 // Llamada a la función del servidor (calendarios, Talentos y lista de equipos)
@@ -997,16 +1000,12 @@ function toggleCard(key, on) { if (on) draft[key] = draft[key] || STEPS.find(s =
 const STEPS = [
   { // 1. Bienvenida y ubicación
     title: 'Hola 👋', html: () => `
-      <p>Vamos a dejar listo el marco en unos minutos. Todo se guarda <b>solo en este iPad</b>.</p>
-      ${navigator.standalone === false ? `<div class="tip">💡 Antes de seguir, añade esta página a la pantalla de inicio (botón Compartir → «Añadir a pantalla de inicio») y abre el asistente desde allí. En iPad, la app de la pantalla de inicio no comparte datos con Safari.</div>` : ''}
+      <p>Vamos a dejar listo el marco en unos minutos. Mejor desde el ordenador: al final te doy un código QR para abrirlo en el iPad.</p>
       <h2>¿Dónde estáis?</h2><p>Para el tiempo y para saber qué gasolineras tenéis cerca.</p>
-      <div class="card"><button class="pri" onclick="geoHere()">📍 Usar la ubicación de este iPad</button>
+      <div class="card"><button class="pri" onclick="geoHere()">📍 Usar mi ubicación</button>
         <label for="city">O busca tu ciudad</label><div class="row"><div><input id="city" placeholder="Ej. Valladolid" onkeydown="if(event.key==='Enter')findCity()"></div><button onclick="findCity()">Buscar</button></div>
         <div id="cities"></div>
-        <p class="res" id="here">${draft.lat ? `✅ ${esc(draft.place || 'Ubicación guardada')} (${draft.lat}, ${draft.lon})` : ''}</p></div>
-      <details><summary>¿Ya lo configuraste en otro iPad?</summary>
-        <div class="card"><label for="imp">Pega aquí el código de configuración</label><textarea id="imp"></textarea>
-        <button onclick="importCode()">Importar</button></div></details>`,
+        <p class="res" id="here">${draft.lat ? `✅ ${esc(draft.place || 'Ubicación guardada')} (${draft.lat}, ${draft.lon})` : ''}</p></div>`,
     read() { if (draft.lat == null) return 'Elige una ubicación'; } },
   { // 3. Calendarios
     title: 'Calendarios', html: () => `
@@ -1130,9 +1129,11 @@ const STEPS = [
         ${draft.gas ? `<li>⛽ ${draft.gas.ids.length} gasolinera${draft.gas.ids.length > 1 ? 's' : ''}</li>` : ''}
         ${draft.luz ? `<li>⚡ Luz (${draft.luz.tarifa === 'pvpc' ? 'PVPC' : 'tramos'})</li>` : ''}
         ${draft.talentos ? '<li>⭐ Talentos</li>' : ''}</ul></div>
-      <details><summary>Configurar otro iPad igual</summary><div class="card">
-        <p>Copia este código y pégalo en el asistente del otro iPad. Lleva las direcciones de los calendarios: trátalo como una contraseña.</p>
-        <textarea id="code" readonly>${codificar(draft)}</textarea><button onclick="navigator.clipboard.writeText($('code').value).then(()=>say('Copiado',1))">Copiar</button></div></details>
+      <h2>Ábrelo en el iPad</h2>
+      <div class="card"><p>Apunta la cámara del iPad a este código (o envíate el enlace) y ábrelo en Safari. Después: Compartir → «Añadir a pantalla de inicio».</p>
+        <div id="qr" style="max-width:420px;margin:12px auto;background:#fff">${qrSvg(enlace())}</div>
+        <button onclick="navigator.clipboard.writeText(enlace()).then(()=>say('Enlace copiado',1))">Copiar enlace</button>
+        <p class="res">El enlace lleva las direcciones de tus calendarios: compártelo solo con tu familia.</p></div>
       <p class="res">Para cambiar algo más adelante, toca ⚙︎ abajo a la derecha del marco.</p>`,
     read() {} },
 ];
@@ -1155,15 +1156,15 @@ async function go(dir) {
   b.disabled = false;
   if (err) return say(err);
   if (stepIdx < STEPS.length - 1) { stepIdx++; return drawStep(); }
-  store.set('marco_cfg', JSON.stringify(draft));
-  if (store.get('marco_cfg') !== JSON.stringify(draft)) return say('No se pudo guardar en este iPad (¿navegación privada?)');
+  const code = codificar(draft);
+  store.set('marco_cfg', JSON.stringify(draft)); store.set('marco_imp', code);
+  if (store.get('marco_cfg') !== JSON.stringify(draft)) return say('No se pudo guardar (¿navegación privada?)');
+  history.replaceState(null, '', '#cfg=' + code);
   location.reload();
 }
-function importCode() {
-  const c = decodificar(val('imp'));
-  if (c?.lat == null) return say('Ese código no es válido');
-  draft = c; stepIdx = STEPS.length - 1; drawStep();
-}
+const enlace = () => location.origin + location.pathname + '#cfg=' + codificar(draft);
+// ponytail: con 4 calendarios el QR sale denso (~140 módulos); si cuesta escanearlo, comprimir con CompressionStream
+function qrSvg(text) { const q = qrcode(0, 'L'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); }
 // Ubicación: la del iPad (redondeada a ~1 km, de sobra para el tiempo) o la de una ciudad buscada
 function setPlace(lat, lon, place) {
   Object.assign(draft, { lat: +(+lat).toFixed(2), lon: +(+lon).toFixed(2), place });
