@@ -1030,6 +1030,15 @@ async function checkVersion() {
     ver = ver || await proxy({ version: 1 });
     if (!ver.sha) return put('<p class="res">Solo se puede comprobar cuando está publicado en Vercel desde GitHub.</p>');
     if (`${ver.owner}/${ver.repo}`.toLowerCase() === ORIGINAL) return put(`<p class="res">Este es el marco original (versión ${ver.sha.slice(0, 7)}).</p>`);
+    // Solo un fork puede recibir novedades. Una copia hecha con el botón de Vercel no lo es (y suele ser privada: GitHub da 404)
+    const info = await fetch(`https://api.github.com/repos/${ver.owner}/${ver.repo}`);
+    if (info.status === 403) throw new Error('GitHub pide esperar un rato');
+    const repo = info.ok ? await info.json() : {};
+    if (repo.parent?.full_name?.toLowerCase() !== ORIGINAL) return put(`<p><b>Tu copia no recibe novedades</b> porque no es un fork del marco original${info.ok ? '' : ' (o es privada)'}.</p>
+      <ol><li>Haz un fork: <a href="https://github.com/${ORIGINAL}/fork" target="_blank">github.com/${ORIGINAL}/fork</a> → «Create fork». Si ya tienes un repo con ese nombre, cámbiale antes el nombre.</li>
+        <li>En Vercel: tu proyecto → Settings → Git → «Disconnect» y luego «Connect Git Repository» con el fork.</li>
+        <li>En el fork, pulsa «Sync fork» (o en Vercel → Deployments → «Create Deployment» con <b>main</b>).</li></ol>
+      <p class="res">La dirección del marco y tu configuración no cambian.</p>`);
     const r = await fetch(`https://api.github.com/repos/${ver.owner}/${ver.repo}/compare/${ver.sha}...${ORIGINAL.split('/')[0]}:main`);
     if (!r.ok) throw new Error(r.status === 403 ? 'GitHub pide esperar un rato' : 'GitHub respondió ' + r.status);
     const c = await r.json();
