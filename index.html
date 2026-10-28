@@ -356,12 +356,12 @@ const store = {
 let cfg = null;
 (() => {
   const h = location.hash.match(/^#cfg=(.+)$/), imp = h && decodificar(decodeURIComponent(h[1]));
-  if (imp?.clave) { store.set('marco_cfg', JSON.stringify(imp)); history.replaceState(null, '', location.pathname); }
+  if (imp?.lat != null) { store.set('marco_cfg', JSON.stringify(imp)); history.replaceState(null, '', location.pathname); }
   try { cfg = JSON.parse(store.get('marco_cfg') || 'null'); } catch {}
 })();
-// Llamada a la función del servidor (calendarios y Talentos), con la clave del marco
-async function proxy(params, clave = cfg.clave) {
-  const r = await fetch('/api/proxy?' + new URLSearchParams(params), { headers: { 'X-Marco-Clave': clave } });
+// Llamada a la función del servidor (calendarios, Talentos y lista de equipos)
+async function proxy(params) {
+  const r = await fetch('/api/proxy?' + new URLSearchParams(params));
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || 'servidor ' + r.status);
   return j;
@@ -995,28 +995,18 @@ const enabledToggle = (key, label) => `<label class="tog"><input type="checkbox"
 function toggleCard(key, on) { if (on) draft[key] = draft[key] || STEPS.find(s => s.key === key).empty(); else delete draft[key]; drawStep(); }
 
 const STEPS = [
-  { // 1. Clave
+  { // 1. Bienvenida y ubicación
     title: 'Hola 👋', html: () => `
-      <p>Vamos a dejar listo el marco en unos minutos. Todo lo que pongas aquí se guarda <b>solo en este iPad</b>.</p>
+      <p>Vamos a dejar listo el marco en unos minutos. Todo se guarda <b>solo en este iPad</b>.</p>
       ${navigator.standalone === false ? `<div class="tip">💡 Antes de seguir, añade esta página a la pantalla de inicio (botón Compartir → «Añadir a pantalla de inicio») y abre el asistente desde allí. En iPad, la app de la pantalla de inicio no comparte datos con Safari.</div>` : ''}
-      <div class="card"><label for="clave">Clave del marco</label>
-        <input id="clave" type="password" value="${esc(draft.clave || '')}" autocomplete="off" placeholder="La que pusiste en Vercel (MARCO_CLAVE)">
-        <p class="res">Es la clave que inventaste al desplegar en Vercel.</p></div>
-      <details><summary>¿Ya lo configuraste en otro iPad?</summary>
-        <div class="card"><label for="imp">Pega aquí el código de configuración</label><textarea id="imp"></textarea>
-        <button onclick="importCode()">Importar</button></div></details>`,
-    async read() {
-      draft.clave = val('clave');
-      if (!draft.clave) return 'Escribe la clave';
-      await proxy({}, draft.clave).catch(e => { throw new Error(e.message === 'Clave incorrecta' ? 'Esa clave no es la de Vercel' : e.message); });
-    } },
-  { // 2. Ubicación
-    title: '¿Dónde estáis?', html: () => `
-      <p>Para el tiempo y para saber qué gasolineras tenéis cerca.</p>
+      <h2>¿Dónde estáis?</h2><p>Para el tiempo y para saber qué gasolineras tenéis cerca.</p>
       <div class="card"><button class="pri" onclick="geoHere()">📍 Usar la ubicación de este iPad</button>
         <label for="city">O busca tu ciudad</label><div class="row"><div><input id="city" placeholder="Ej. Valladolid" onkeydown="if(event.key==='Enter')findCity()"></div><button onclick="findCity()">Buscar</button></div>
         <div id="cities"></div>
-        <p class="res" id="here">${draft.lat ? `✅ ${esc(draft.place || 'Ubicación guardada')} (${draft.lat}, ${draft.lon})` : ''}</p></div>`,
+        <p class="res" id="here">${draft.lat ? `✅ ${esc(draft.place || 'Ubicación guardada')} (${draft.lat}, ${draft.lon})` : ''}</p></div>
+      <details><summary>¿Ya lo configuraste en otro iPad?</summary>
+        <div class="card"><label for="imp">Pega aquí el código de configuración</label><textarea id="imp"></textarea>
+        <button onclick="importCode()">Importar</button></div></details>`,
     read() { if (draft.lat == null) return 'Elige una ubicación'; } },
   { // 3. Calendarios
     title: 'Calendarios', html: () => `
@@ -1070,7 +1060,7 @@ const STEPS = [
     async after() {
       if (!draft.team) return;
       const lg = draft.team.league;
-      teamsCache[lg] ||= await proxy({ equipos: lg }, draft.clave).then(l => l.sort((a, b) => a.name.localeCompare(b.name, 'es'))).catch(() => null);
+      teamsCache[lg] ||= await proxy({ equipos: lg }).then(l => l.sort((a, b) => a.name.localeCompare(b.name, 'es'))).catch(() => null);
       if (!$('tm')) return;
       $('tm').innerHTML = teamsCache[lg] ? '<option value="">Elige equipo</option>' + teamsCache[lg].map(t => `<option value="${esc(t.id)}" ${draft.team.id === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')
         : '<option value="">No se pudo cargar la lista</option>';
@@ -1126,7 +1116,7 @@ const STEPS = [
       if (!draft.talentos) return;
       const code = codigoTablero(val('tab'));
       if (!code) return 'Pega el enlace del tablero';
-      await proxy({ tablero: code }, draft.clave);
+      await proxy({ tablero: code });
       draft.talentos.code = code;
     } },
   { // 9. Listo
@@ -1141,7 +1131,7 @@ const STEPS = [
         ${draft.luz ? `<li>⚡ Luz (${draft.luz.tarifa === 'pvpc' ? 'PVPC' : 'tramos'})</li>` : ''}
         ${draft.talentos ? '<li>⭐ Talentos</li>' : ''}</ul></div>
       <details><summary>Configurar otro iPad igual</summary><div class="card">
-        <p>Copia este código y pégalo en el asistente del otro iPad. Lleva la clave y los calendarios: trátalo como una contraseña.</p>
+        <p>Copia este código y pégalo en el asistente del otro iPad. Lleva las direcciones de los calendarios: trátalo como una contraseña.</p>
         <textarea id="code" readonly>${codificar(draft)}</textarea><button onclick="navigator.clipboard.writeText($('code').value).then(()=>say('Copiado',1))">Copiar</button></div></details>
       <p class="res">Para cambiar algo más adelante, toca ⚙︎ abajo a la derecha del marco.</p>`,
     read() {} },
@@ -1171,7 +1161,7 @@ async function go(dir) {
 }
 function importCode() {
   const c = decodificar(val('imp'));
-  if (!c?.clave) return say('Ese código no es válido');
+  if (c?.lat == null) return say('Ese código no es válido');
   draft = c; stepIdx = STEPS.length - 1; drawStep();
 }
 // Ubicación: la del iPad (redondeada a ~1 km, de sobra para el tiempo) o la de una ciudad buscada
@@ -1198,7 +1188,7 @@ async function testCal(i) {
   const c = draft.cals[i], out = $('cal' + i);
   out.textContent = 'Leyendo…';
   try {
-    const j = await proxy({ cal: c.url, desde: new Date().toISOString(), hasta: addDays(new Date(), 30).toISOString() }, draft.clave);
+    const j = await proxy({ cal: c.url, desde: new Date().toISOString(), hasta: addDays(new Date(), 30).toISOString() });
     if (!c.name && j.name) { c.name = j.name; drawStep(); return testCal(i); }
     out.innerHTML = `<span class="ok">✓ ${esc(j.name || 'Funciona')}</span> · ${j.events.length ? 'próximos: ' + j.events.slice(0, 3).map(e => esc(e.title)).join(', ') : 'sin eventos en los próximos 30 días'}`;
   } catch (e) { out.innerHTML = `<span style="color:var(--accent)">✗ ${esc(e.message)}</span>`; }
@@ -1227,14 +1217,14 @@ async function testBoard() {
   if (!code) return say('Pega el enlace del tablero');
   out.innerHTML = '<p class="res">Leyendo…</p>';
   try {
-    const j = await proxy({ tablero: code }, draft.clave);
+    const j = await proxy({ tablero: code });
     out.innerHTML = `<p class="res"><span class="ok">✓ ${esc(j.family || 'Tablero encontrado')}</span></p><div class="kidsprev">${(j.kids || []).map((k, i) => {
       const c = /^#[0-9a-f]{6}$/i.test(k.color) ? k.color : KID_COLORS[i % 4];
       return `<span style="background:${c}22;color:${c}">${esc(k.avatar || '⭐')} ${esc(k.name)} · ${fmtPts(k.balance)} ⭐</span>`; }).join('')}</div>`;
   } catch (e) { out.innerHTML = `<p class="res" style="color:var(--accent)">✗ ${esc(e.message)}</p>`; }
 }
 
-if (cfg?.clave && cfg.lat != null) start(); else { fit(); openSetup(); }
+if (cfg?.lat != null) start(); else { fit(); openSetup(); }
 </script>
 </body>
 </html>

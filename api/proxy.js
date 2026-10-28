@@ -2,10 +2,8 @@
 //   GET /api/proxy?cal=<enlace iCal de Google>&desde=<ISO>&hasta=<ISO>  → eventos ya desarrollados
 //   GET /api/proxy?tablero=<código de Talentos>                         → saldos de los niños
 //   GET /api/proxy?equipos=esp.1|esp.2                                  → equipos de la liga (ESPN no deja leer esa lista desde otra web)
-//   GET /api/proxy                                                       → 200 si la clave es buena (para el asistente)
-// Siempre exige la cabecera X-Marco-Clave = MARCO_CLAVE (variable de entorno de Vercel), para que nadie más la use.
-// Solo habla con Google Calendar, Talentos y ESPN: no es un proxy abierto.
-import { timingSafeEqual } from 'node:crypto'
+// Sin clave a propósito: solo habla con Google Calendar, Talentos y ESPN (no es un proxy abierto) y no guarda nada.
+// Quien la use solo puede leer un calendario cuya dirección secreta ya tiene, o un tablero cuyo código ya conoce.
 import { eventos } from './_calendario.js'
 
 const TALENTOS = 'https://lostalentos.vercel.app'
@@ -13,9 +11,6 @@ const DIA = 864e5
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
-  const clave = process.env.MARCO_CLAVE
-  if (!clave) return res.status(500).json({ error: 'Falta MARCO_CLAVE en las variables de entorno de Vercel' })
-  if (!igual(String(req.headers['x-marco-clave'] || ''), clave)) return res.status(401).json({ error: 'Clave incorrecta' })
 
   const { cal, tablero, equipos } = req.query
   try {
@@ -41,13 +36,12 @@ export default async function handler(req, res) {
       const teams = (await r.json()).sports?.[0]?.leagues?.[0]?.teams || []
       return res.json(teams.map(({ team: t }) => ({ id: t.id, name: t.displayName, short: t.shortDisplayName, color: t.color, alt: t.alternateColor })))
     }
-    return res.json({ ok: true })
+    return res.status(400).json({ error: 'Falta qué leer: cal, tablero o equipos' })
   } catch (e) {
     return res.status(502).json({ error: e.name === 'TimeoutError' ? 'Tardó demasiado en responder' : 'No se pudo leer: ' + e.message })
   }
 }
 
-const igual = (a, b) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b))
 const fechaO = (v, def) => { const t = v ? Date.parse(v) : NaN; return new Date(isNaN(t) ? def : t) }
 
 // Acepta el enlace tal como lo copia Google (https o webcal) y solo de calendar.google.com
