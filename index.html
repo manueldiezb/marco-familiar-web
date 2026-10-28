@@ -1,0 +1,1240 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Casa">
+<link rel="apple-touch-icon" href="icono-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icono-32.png">
+<title>Marco familiar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Todo el panel se maqueta en píxeles de diseño y #stage se escala a la pantalla del iPad (fit()).
+   Colores y medidas del marco Android original (leontdi/marco-familiar-dashboard). */
+:root {
+  --bg: #F7EEE2; --card: #FFFDF9; --line: #EADBC6;
+  --ink: #221D18; --soft: #6E6358; --muted: #A6998A;
+  --accent: #C8243B; --rain: #2F80ED; --warm: #F5A623; --online: #3BA55C;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
+  font-family: Geist, -apple-system, system-ui, sans-serif; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+/* La rejilla (columnas, filas y qué tarjeta va en cada hueco) la pone layout() según las tarjetas activas */
+#stage { width: 1920px; transform-origin: 0 0; padding: 28px 36px; display: grid; gap: 20px; }
+#sky { grid-area: sky; } #next { grid-area: next; } #week { grid-area: week; } #kids { grid-area: kids; }
+#swap { grid-area: swap; } #luz { grid-area: luz; } #energy { grid-area: energy; }
+#stage > * { min-width: 0; min-height: 0; }
+.week { display: flex; gap: 12px; }
+/* 10 días; se ven 5 y al deslizar encaja en los 5 siguientes (scroll nativo sin barra) */
+#week { flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+#week::-webkit-scrollbar { display: none; }
+#week .day { flex: 0 0 calc((100% - 48px) / 5); }
+#week .day:nth-child(5n + 1) { scroll-snap-align: start; scroll-snap-stop: always; }
+
+/* Cielo: degradado según el tiempo y el momento del día */
+.sky { position: relative; overflow: hidden; border-radius: 28px; padding: 16px 36px; display: flex; align-items: center;
+  --ink2: #fff; --soft2: rgba(255,255,255,.8); text-shadow: 0 1px 8px rgba(0,0,0,.35); transition: background 2s ease; cursor: pointer; }
+.sky::after { content: ''; position: absolute; width: 520px; height: 520px; border-radius: 50%; left: 34%; top: -300px; pointer-events: none;
+  background: radial-gradient(circle, var(--glow, rgba(255,240,200,.35)), transparent 65%); }
+.sky > * { position: relative; z-index: 1; }
+.sky .left { flex: 1; color: var(--ink2); }
+.clock { font-size: 150px; line-height: 150px; letter-spacing: -6px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.dateline { font-size: 34px; line-height: 42px; white-space: nowrap; }
+.dateline b { font-weight: 600; } .dateline span { color: var(--soft2); }
+.wx { flex: 1.25; display: flex; align-items: center; height: 100%; }
+.wx .cur { display: flex; flex-direction: column; align-items: center; margin-right: 18px; }
+.wx .cur .t { font-size: 46px; line-height: 54px; font-weight: 600; color: var(--ink2); }
+.wx .cur .mm { font-size: 20px; line-height: 24px; font-weight: 500; color: var(--soft2); }
+.chip { flex: 1; margin: 0 3px; padding: 8px 0; border-radius: 18px; display: flex; flex-direction: column; align-items: center;
+  background: rgba(255,255,255,.14); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.12); }
+.chip .d { font-size: 20px; line-height: 24px; font-weight: 600; color: var(--soft2); }
+.chip .mx { font-size: 24px; line-height: 30px; font-weight: 600; color: var(--ink2); }
+.chip .mn { font-size: 20px; line-height: 24px; font-weight: 500; color: var(--soft2); }
+.wxs { flex: 1; display: flex; align-self: stretch; }
+.wxl { flex: 1; display: flex; align-items: center; }
+.rainp { font-size: 15px; white-space: nowrap; color: rgba(255,255,255,.6); }
+.rainp.hi { color: #9CC3FF; font-weight: 600; }
+
+/* Talentos: una casilla grande por niño, con su color, avatar y saldo bien visibles */
+.kids { cursor: pointer; }
+.kids .kg { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 14px; margin-top: 12px; }
+.kid { container-type: size; border-radius: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 0; position: relative; }
+.kid .av { width: clamp(56px, 40cqmin, 150px); height: clamp(56px, 40cqmin, 150px); border-radius: 99px; background: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 56px; line-height: 1; box-shadow: 0 3px 10px rgba(34,29,24,.12); border: 4px solid var(--c); position: relative; }
+.kid .av.ph { border: 5px solid color-mix(in srgb, var(--c) 55%, white); }
+.kid .av img { width: 100%; height: 100%; object-fit: cover; border-radius: 99px; }
+.kid .av .bub { position: absolute; right: -6%; bottom: -6%; width: 40%; height: 40%; border-radius: 99px; background: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: .45em; font-style: normal; border: 2px solid color-mix(in srgb, var(--c) 55%, white); box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+.kid .nm { margin-top: 4cqmin; font-size: clamp(18px, 11cqmin, 34px); line-height: 1.2; font-weight: 700; color: var(--c); }
+.kid .bal { font-size: clamp(36px, 23cqmin, 80px); line-height: 1.1; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
+.kid .bal small { font-size: .5em; margin-left: 4px; }
+.kid .bal.neg { color: #D9483B; }
+.kid.win { animation: kidWin .9s cubic-bezier(.3,1.6,.5,1); z-index: 1; }
+.kid.win .av { animation: avSpin .9s ease; }
+.kid.lose { animation: kidLose .6s ease; }
+@keyframes kidWin { 0% { transform: scale(1); } 30% { transform: scale(1.1); box-shadow: 0 0 0 6px var(--c); } 100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; } }
+@keyframes avSpin { 0% { transform: rotate(0); } 50% { transform: rotate(-12deg) scale(1.15); } 100% { transform: rotate(0); } }
+@keyframes kidLose { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-10px); } 40% { transform: translateX(9px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(3px); } }
+.kid .fly { position: absolute; left: 50%; top: 42%; font-size: 52px; font-weight: 800; pointer-events: none; transform: translate(-50%, -50%);
+  text-shadow: 0 2px 0 #fff, 0 0 12px #fff; animation: flyUp 1.8s ease-out forwards; }
+.kid .fly.up { color: #3BA55C; } .kid .fly.down { color: #D9483B; animation-name: flyDown; }
+@keyframes flyUp { 0% { opacity: 0; transform: translate(-50%, -20%) scale(.5); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.25); } 100% { opacity: 0; transform: translate(-50%, -190%) scale(1); } }
+@keyframes flyDown { 0% { opacity: 0; transform: translate(-50%, -80%) scale(.5); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); } 100% { opacity: 0; transform: translate(-50%, 90%) scale(.9); } }
+.kid .spark { position: absolute; left: 50%; top: 40%; font-size: 26px; font-style: normal; pointer-events: none; opacity: 0; animation: spark 1.3s ease-out forwards; }
+@keyframes spark { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.4); } 70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) scale(1.1) rotate(180deg); } }
+
+/* Lo próximo */
+.next { position: relative; border-radius: 28px; padding: 22px 30px; display: flex; flex-direction: column; justify-content: center; transition: background-color .9s ease, color .9s ease; }
+.next .nx.out { animation: nxOut .45s ease forwards; }
+.next .nx.in { animation: nxIn .55s ease both; }
+@keyframes nxOut { to { opacity: 0; transform: translateY(-14px); } }
+@keyframes nxIn { from { opacity: 0; transform: translateY(14px); } }
+.next .dots { position: absolute; left: 30px; bottom: 16px; display: flex; gap: 8px; }
+.next .dots i { width: 8px; height: 8px; border-radius: 99px; opacity: .35; transition: width .4s, opacity .4s; }
+.next .dots i.on { width: 22px; opacity: .9; }
+.next .top { display: flex; align-items: center; }
+.next .lbl { flex: 1; font-size: 17px; font-weight: 600; letter-spacing: 2.5px; opacity: .9; }
+.next .cal { margin-left: 12px; font-size: 16px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 3px 10px; border-radius: 99px; vertical-align: 1px; }
+.next .left { font-size: 24px; line-height: 30px; font-weight: 700; padding: 2px 14px; border-radius: 16px; }
+.next .tt { font-size: 34px; line-height: 42px; font-weight: 600; margin-top: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.next .when { font-size: 24px; line-height: 30px; opacity: .85; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.next.none { background: var(--card); align-items: center; color: var(--muted); font-size: 29px; }
+
+/* La semana */
+.day { flex: 1; min-width: 0; border-radius: 24px; padding: 14px; display: flex; flex-direction: column; background: rgba(255,253,249,.6); }
+.day.today { background: var(--card); }
+.day .hd { display: flex; align-items: flex-end; }
+.day .hd .n { flex: 1; font-size: 24px; line-height: 30px; font-weight: 600; color: var(--soft); }
+.day .hd .num { font-size: 34px; line-height: 42px; font-weight: 600; }
+.day.today .hd .n, .day.today .hd .num { color: var(--accent); }
+.allday { margin-bottom: 6px; flex: none; font-size: 17px; font-weight: 600; padding: 3px 10px; border-radius: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hair { height: 1px; background: var(--line); margin: 10px 0; flex: none; }
+.evs { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; scrollbar-width: none; padding-bottom: 24px;
+  -webkit-mask-image: linear-gradient(#000 85%, transparent); mask-image: linear-gradient(#000 85%, transparent); }
+.evs::-webkit-scrollbar { display: none; }
+.ev { display: flex; }
+.ev.past { opacity: .4; }
+.ev .bar { width: 5px; border-radius: 3px; flex: none; }
+.ev .body { padding-left: 8px; min-width: 0; }
+.ev .h { font-size: 15px; font-weight: 600; color: var(--soft); }
+.ev .t { font-size: 18px; line-height: 22px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.dash { font-size: 24px; color: var(--muted); }
+
+/* Tarjetas de abajo */
+.tile { border-radius: 28px; background: var(--card); padding: 18px 24px; display: flex; flex-direction: column; min-width: 0; }
+.tile .th { display: flex; align-items: center; font-size: 29px; }
+.tile .th span { margin-left: 10px; font-size: 18px; font-weight: 600; letter-spacing: 2.5px; }
+.tile .sub { font-size: 24px; line-height: 30px; color: var(--soft); margin-top: 4px; }
+/* Cuenta atrás y fútbol comparten hueco: se alternan con un fundido */
+.swap { position: relative; touch-action: pan-y; }
+.swap > .tile { position: absolute; inset: 0; transition: opacity .9s ease, transform .9s ease; }
+.swap > .tile.off { opacity: 0; transform: scale(.97); pointer-events: none; }
+#sdots { position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%); display: flex; z-index: 2; }
+#sdots i { width: 8px; height: 8px; margin: 3px 6px; border-radius: 50%; background: var(--line); cursor: pointer; transition: background .3s, transform .3s; }
+#sdots i::before { content: ''; display: block; margin: -8px; width: 24px; height: 24px; }
+#sdots i.on { background: var(--soft); transform: scale(1.2); }
+
+/* Fútbol: colores del equipo (--tc oscuro, --ta claro, de ESPN) y su escudo de marca de agua */
+.rm { overflow: hidden; background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--ta) 22%, white) 0%, var(--card) 55%); border: 2px solid color-mix(in srgb, var(--tc) 35%, white); }
+.rm .wm { position: absolute; right: -40px; bottom: -50px; width: 260px; height: 260px; opacity: .07; pointer-events: none; }
+.rm .th span { color: var(--tc); }
+.rm .cols { display: flex; gap: 14px; flex: 1; margin-top: 8px; min-height: 0; }
+.rm .last { cursor: pointer; width: 52%; min-width: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 20px; padding: 10px 8px;
+  background: linear-gradient(160deg, var(--tc), color-mix(in srgb, var(--tc) 70%, black)); color: #fff; position: relative; }
+.rm .k { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; color: rgba(255,255,255,.75); white-space: nowrap; }
+.rm .k.live { color: #FF5A5F; animation: blink 1.4s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+.rm .score { display: flex; align-items: center; gap: 8px; margin: 6px 0 4px; white-space: nowrap; }
+.rm .score img { width: 42px; height: 42px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); }
+.rm .score b { font-size: 40px; line-height: 44px; font-weight: 700; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+.rm .res { font-size: 13px; font-weight: 700; letter-spacing: 1px; padding: 2px 10px; border-radius: 99px; }
+.rm .meta { font-size: 13px; opacity: .75; margin-top: 4px; white-space: nowrap; }
+.rm .next2 { flex: 1; display: flex; flex-direction: column; gap: 6px; justify-content: center; min-width: 0; }
+.rm .k2 { font-size: 12px; font-weight: 700; letter-spacing: 2px; color: var(--soft); }
+.rm .fx { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-radius: 16px; background: color-mix(in srgb, var(--ta) 14%, transparent); min-width: 0; }
+.rm .fx img { width: 38px; height: 38px; object-fit: contain; flex: none; }
+.rm .fx .who { font-size: 19px; line-height: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm .fx .who .ha { font-size: 15px; font-weight: 600; color: var(--soft); }
+.rm .fx .when { font-size: 13px; line-height: 18px; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Cuenta atrás: degradado azul-lavanda-rosa, número grande y barra con el emoji latiendo */
+.cdown { position: relative; overflow: hidden; background: linear-gradient(135deg, #DCEBFF 0%, #ECE4FF 55%, #FFE6EF 100%); }
+.cdown .bb { display: flex; align-items: center; gap: 22px; flex: 1; }
+.bcount { display: flex; flex-direction: column; align-items: center; min-width: 150px; }
+.bn { font-size: 112px; line-height: 100px; font-weight: 600; letter-spacing: -4px;
+  background: linear-gradient(180deg, #5B7FD6, #8E5BC8); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.bl { font-size: 22px; font-weight: 600; color: #6C7DB0; letter-spacing: 3px; text-transform: uppercase; }
+.binfo { flex: 1; min-width: 0; }
+.bmsg { font-size: 29px; line-height: 36px; font-weight: 600; color: #34406B; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.bdate { font-size: 20px; color: #6C7DB0; margin-top: 2px; }
+.bbar { position: relative; height: 14px; border-radius: 99px; background: rgba(255,255,255,.7); margin-top: 18px; }
+.bbar div { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #A9C6FF, #8E5BC8); }
+.beat { position: absolute; top: 50%; font-size: 30px; transform: translate(-50%, -50%); animation: beat 1.4s ease-in-out infinite; }
+@keyframes beat { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 15% { transform: translate(-50%, -50%) scale(1.25); } 30% { transform: translate(-50%, -50%) scale(1); } 45% { transform: translate(-50%, -50%) scale(1.15); } }
+.twinkle { position: absolute; color: #fff; opacity: .9; animation: float 6s ease-in-out infinite; pointer-events: none; }
+.s1 { top: 18px; right: 40px; font-size: 26px; } .s2 { top: 70px; right: 120px; font-size: 18px; animation-delay: -2s; }
+.s3 { bottom: 20px; right: 28px; font-size: 44px; opacity: .7; animation-delay: -4s; }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+/* Luz: barras por hora (color según lo cara que es en el día) y cuándo poner cada aparato */
+.luz .th .now { margin-left: auto; font-size: 22px; font-weight: 600; white-space: nowrap; }
+.luz .th .now small { font-size: 15px; color: var(--soft); font-weight: 500; }
+.luz .bars { flex: 1; min-height: 0; display: flex; align-items: flex-end; gap: 3px; margin-top: 10px; }
+.luz .bars i { flex: 1; border-radius: 5px 5px 2px 2px; min-height: 8px; }
+.luz .bars i.past { opacity: .3; }
+.luz .bars i.cur { outline: 3px solid var(--ink); outline-offset: 1px; }
+.luz .lbls { display: flex; gap: 3px; font-size: 14px; color: var(--muted); margin-top: 4px; }
+.luz .lbls span { flex: 1; text-align: center; white-space: nowrap; }
+.luz .apps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.luz .app { font-size: 18px; line-height: 24px; font-weight: 600; padding: 4px 12px; border-radius: 14px; background: rgba(59,165,92,.13); white-space: nowrap; }
+.luz .app small { font-weight: 500; color: var(--soft); }
+.luz .per { font-size: 44px; line-height: 52px; font-weight: 700; margin-top: 6px; }
+.luz .per small { font-size: 22px; font-weight: 500; color: var(--soft); margin-left: 8px; }
+.luz .strip { display: flex; gap: 3px; height: 26px; margin-top: 10px; }
+.luz .strip i { flex: 1; border-radius: 5px; }
+.luz .strip i.cur { outline: 3px solid var(--ink); outline-offset: 1px; }
+.luz .hrs { display: flex; justify-content: space-between; font-size: 14px; color: var(--muted); margin-top: 4px; }
+
+/* Gasolina */
+.energy { container-type: inline-size; }
+.gas { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; gap: 6px; min-width: 0; min-height: 0; overflow: hidden; margin-top: 6px; }
+.st { flex: 1; max-height: 58px; display: flex; align-items: center; gap: 12px; padding: 0 14px 0 8px; border-radius: 14px; min-width: 0; }
+.logo { width: 38px; height: 38px; flex: none; border-radius: 10px; background: #fff; box-shadow: 0 1px 3px rgba(34,29,24,.12);
+  display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: var(--soft); }
+.sinfo { min-width: 0; flex: 1; }
+.sname { font-size: 17px; line-height: 20px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sa { font-size: 14px; line-height: 17px; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sprice { font-size: 26px; font-weight: 700; letter-spacing: -.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sprice small { font-size: 13px; font-weight: 600; letter-spacing: 0; margin-left: 2px; opacity: .7; }
+@container (max-width: 480px) { .sprice small { display: none; } }
+.tag { margin-right: 6px; font-size: 10px; font-weight: 700; letter-spacing: 1px; padding: 1px 7px; border-radius: 99px; color: #fff; vertical-align: 2px; }
+
+/* Ventanas (tiempo en detalle, partido, tablero de Talentos) */
+#wxd, #rmd, #tbd { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; background: rgba(34,29,24,.35); }
+#wxd.on, #rmd.on, #tbd.on { display: flex; animation: devIn .25s ease; }
+@keyframes devIn { from { opacity: 0; } }
+#wxd .box, #rmd .box { position: relative; width: min(1500px, calc(100% - 60px)); max-height: calc(100% - 60px); overflow-y: auto; border-radius: 32px; background: var(--card);
+  padding: 28px 36px; box-shadow: 0 30px 80px rgba(34,29,24,.3); }
+#wxd .x, #rmd .x { position: absolute; right: 26px; top: 18px; font-size: 30px; color: var(--muted); cursor: pointer; }
+#wxd .hd { display: flex; align-items: center; gap: 22px; padding-right: 40px; }
+#wxd .now { font-size: 120px; line-height: 110px; font-weight: 700; letter-spacing: -5px; }
+#wxd .ds { flex: 1; min-width: 0; } #wxd .ds b { display: block; font-size: 34px; line-height: 42px; font-weight: 500; }
+#wxd .ds span { font-size: 22px; color: var(--soft); }
+#wxd .chips { display: flex; gap: 12px; }
+#wxd .chip2 { padding: 10px 18px; border-radius: 22px; background: rgba(234,219,198,.55); text-align: center; font-size: 22px; font-weight: 600; white-space: nowrap; }
+#wxd .chip2 small { font-size: 14px; color: var(--soft); font-weight: 500; }
+#wxd .chip2 .ic { display: block; font-size: 26px; line-height: 32px; }
+#wxd svg.ch { display: block; width: 100%; margin-top: 10px; }
+#wxd .hrs { display: grid; margin-top: 4px; }
+#wxd .hrs div { display: flex; flex-direction: column; align-items: center; font: 600 17px/22px ui-monospace, Menlo, monospace; color: var(--soft); }
+#wxd .hr0, #rmd .hr0 { border-top: 2px solid var(--line); margin: 18px 0 16px; }
+#wxd .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
+#wxd .dy { border-radius: 22px; padding: 10px 4px; text-align: center; cursor: pointer; }
+#wxd .dy.sel { background: rgba(234,219,198,.7); }
+#wxd .dy .n { font-size: 26px; line-height: 32px; } #wxd .dy .t { font-size: 26px; font-weight: 600; } #wxd .dy .t i { font-style: normal; color: var(--muted); font-weight: 400; margin-left: 6px; }
+#wxd .dy .r { font-size: 17px; color: #2F80ED; min-height: 22px; }
+#rmd .box { width: min(1100px, calc(100% - 60px)); }
+#tbd .box { position: relative; width: calc(100% - 60px); height: calc(100% - 60px); border-radius: 32px; overflow: hidden; background: var(--card); box-shadow: 0 30px 80px rgba(34,29,24,.3); }
+#tbd iframe { width: 100%; height: 100%; border: 0; display: block; }
+#tbd .x { position: absolute; right: 18px; top: 18px; width: 52px; height: 52px; border-radius: 99px; background: rgba(34,29,24,.55); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 26px; cursor: pointer; backdrop-filter: blur(8px); }
+#rmd .sc { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 20px; text-align: center; }
+#rmd .sc img { width: 110px; height: 110px; object-fit: contain; }
+#rmd .sc .tn { font-size: 28px; font-weight: 600; margin-top: 6px; }
+#rmd .sc .big { font-size: 110px; line-height: 110px; font-weight: 700; letter-spacing: -4px; font-variant-numeric: tabular-nums; }
+#rmd .mt { text-align: center; font-size: 20px; color: var(--soft); margin-top: 6px; }
+#rmd .gl { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 40px; }
+#rmd .g { font-size: 24px; line-height: 32px; } #rmd .g.r { text-align: right; } #rmd .g.a { text-align: left; }
+#rmd .g b { font: 700 20px ui-monospace, Menlo, monospace; color: var(--soft); margin: 0 8px; }
+#rmd .g small { display: block; font-size: 17px; line-height: 20px; color: var(--soft); }
+#rmd .sts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 50px; }
+#rmd .sr { display: grid; grid-template-columns: 70px 1fr 70px; align-items: center; gap: 4px 16px; font-size: 22px; font-weight: 600; }
+#rmd .sr .l { grid-column: 1 / -1; text-align: center; font-size: 16px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--soft); margin-top: 8px; }
+#rmd .sr .v { text-align: center; font-variant-numeric: tabular-nums; }
+#rmd .bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--line); }
+
+#status { position: fixed; right: 54px; bottom: 6px; font-size: 11px; color: var(--muted); }
+#status.err { color: var(--accent); font-weight: 600; }
+#gear { position: fixed; right: 8px; bottom: 2px; width: 40px; height: 40px; border: 0; background: none; font-size: 20px; color: var(--muted); opacity: .5; cursor: pointer; }
+
+/* --- Asistente: pantalla normal (no escalada), pensada para el dedo --- */
+#setup { position: fixed; inset: 0; z-index: 50; background: var(--bg); overflow-y: auto; -webkit-user-select: text; user-select: text;
+  padding: calc(env(safe-area-inset-top) + 24px) 16px 40px; font-size: 18px; line-height: 1.45; }
+#setup .w { max-width: 760px; margin: 0 auto; }
+#setup .steps { display: flex; gap: 6px; margin-bottom: 22px; }
+#setup .steps i { flex: 1; height: 5px; border-radius: 9px; background: var(--line); }
+#setup .steps i.on { background: var(--ink); }
+#setup h1 { font-size: 34px; line-height: 1.15; letter-spacing: -.5px; margin-bottom: 8px; }
+#setup h2 { font-size: 20px; margin: 22px 0 8px; }
+#setup p { color: var(--soft); margin-bottom: 12px; }
+#setup .card { background: var(--card); border-radius: 20px; padding: 18px; margin: 12px 0; box-shadow: 0 1px 3px rgba(34,29,24,.06); }
+#setup label { display: block; font-size: 15px; font-weight: 600; color: var(--soft); margin: 10px 0 4px; }
+#setup input:not([type=checkbox]):not([type=radio]):not([type=color]), #setup select, #setup textarea {
+  width: 100%; font: 17px Geist, -apple-system, sans-serif; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+#setup textarea { min-height: 90px; font: 13px ui-monospace, Menlo, monospace; word-break: break-all; }
+#setup input[type=color] { width: 52px; height: 48px; border: 1px solid var(--line); border-radius: 12px; padding: 4px; background: #fff; flex: none; }
+#setup .row { display: flex; gap: 10px; align-items: flex-end; }
+#setup .row > div { flex: 1; min-width: 0; }
+#setup button { font: 600 17px Geist, -apple-system, sans-serif; padding: 12px 18px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+#setup button.pri { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+#setup button.lnk { border: 0; background: none; padding: 6px 0; color: var(--accent); }
+#setup .nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 28px; }
+#setup .nav .pri { flex: 1; max-width: 320px; margin-left: auto; }
+#setup .err { color: var(--accent); font-weight: 600; min-height: 26px; margin-top: 12px; }
+#setup .ok { color: var(--online); font-weight: 600; }
+#setup .tip { font-size: 15px; background: #FFF4DC; border-radius: 14px; padding: 12px 14px; color: #6B4E12; margin: 12px 0; }
+#setup .tog { display: flex; align-items: center; gap: 12px; font-size: 19px; font-weight: 600; color: var(--ink); margin: 6px 0 4px; }
+#setup .tog input { width: 26px; height: 26px; }
+#setup .pick { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-bottom: 1px solid var(--line); font-size: 16px; color: var(--ink); font-weight: 500; margin: 0; }
+#setup .pick input { width: 22px; height: 22px; flex: none; }
+#setup .pick small { color: var(--soft); display: block; }
+#setup .pick b { margin-left: auto; font-variant-numeric: tabular-nums; }
+#setup details { margin: 10px 0; } #setup summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+#setup ol { padding-left: 22px; color: var(--soft); } #setup li { margin: 4px 0; }
+#setup .res { font-size: 15px; margin-top: 8px; color: var(--soft); }
+#setup .kidsprev { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+#setup .kidsprev span { padding: 6px 12px; border-radius: 99px; font-weight: 600; }
+#setup .rm-x { flex: none; padding: 12px 14px; }
+</style>
+</head>
+<body>
+<div id="stage">
+<!-- dentro de #stage para que escalen con él (fixed dentro de un transform se ancla al stage) -->
+<div id="wxd" onclick="if (event.target === this) closeWxd()"><div class="box"></div></div>
+<div id="rmd" onclick="if (event.target === this) closeRmd()"><div class="box"></div></div>
+<div id="tbd" onclick="if (event.target === this) closeTbd()"><div class="box"></div></div>
+  <div class="sky" id="sky" onclick="openWxd()">
+    <div class="left"><div class="clock" id="clock">--:--</div><div class="dateline" id="date"></div></div>
+    <div class="wx" id="wx"></div>
+  </div>
+  <div class="next none" id="next">Semana sin citas</div>
+  <div class="week" id="week"></div>
+  <div class="tile kids" id="kids" onclick="openTbd()" hidden></div>
+  <div class="swap" id="swap" hidden><div class="tile cdown" id="cdown"></div><div class="tile rm off" id="rm"></div>
+    <div id="sdots" hidden><i class="on" onclick="swapShow(0)"></i><i onclick="swapShow(1)"></i></div></div>
+  <div class="tile luz" id="luz" hidden></div>
+  <div class="tile energy" id="energy" hidden></div>
+</div>
+<div id="status"></div>
+<button id="gear" onclick="openSetup()" aria-label="Ajustes">⚙︎</button>
+<div id="setup" hidden><div class="w"></div></div>
+<script src="logica.js"></script>
+<script>
+const DOW = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const DOW_LONG = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const p2 = n => String(n).padStart(2, '0');
+const hm = d => p2(d.getHours()) + ':' + p2(d.getMinutes());
+const sod = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const ymd = d => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+const deg = v => Math.round(v) + '°';
+const cap = s => s[0].toUpperCase() + s.slice(1);
+// Texto encima de un color: oscuro si el color es claro, blanco si no
+const lum = c => { const n = parseInt(c.slice(1), 16); return 0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255); };
+const onColor = c => lum(c) > 170 ? '#221D18' : '#fff';
+const mix = (a, b, t) => '#' + [0, 2, 4].map(i => p2(Math.round(parseInt(a.substr(i + 1, 2), 16) * (1 - t) + parseInt(b.substr(i + 1, 2), 16) * t).toString(16))).join('');
+// verde (lo más barato) → ámbar → rojo (lo más caro)
+function priceColor(p, min, max) {
+  const t = max > min ? Math.min(1, Math.max(0, (p - min) / (max - min))) : 0;
+  return t < .5 ? mix('#3BA55C', '#F5A623', t * 2) : mix('#F5A623', '#D9483B', (t - .5) * 2);
+}
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+
+// --- Configuración: vive solo en este iPad (localStorage). Un enlace con #cfg=<código> la importa ---
+let cfg = null;
+(() => {
+  const h = location.hash.match(/^#cfg=(.+)$/), imp = h && decodificar(decodeURIComponent(h[1]));
+  if (imp?.clave) { store.set('marco_cfg', JSON.stringify(imp)); history.replaceState(null, '', location.pathname); }
+  try { cfg = JSON.parse(store.get('marco_cfg') || 'null'); } catch {}
+})();
+// Llamada a la función del servidor (calendarios y Talentos), con la clave del marco
+async function proxy(params, clave = cfg.clave) {
+  const r = await fetch('/api/proxy?' + new URLSearchParams(params), { headers: { 'X-Marco-Clave': clave } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'servidor ' + r.status);
+  return j;
+}
+
+// --- Escala y rejilla ---
+// Medida real de la pantalla (innerHeight falla en la app de pantalla de inicio de iOS; un div fixed con inset:0 no)
+const probe = document.createElement('div');
+probe.style.cssText = 'position:fixed;inset:0;padding-top:env(safe-area-inset-top);visibility:hidden;pointer-events:none';
+document.body.append(probe);
+function fit() {
+  const W = probe.offsetWidth || innerWidth, H = probe.offsetHeight || innerHeight;
+  const top = parseFloat(getComputedStyle(probe).paddingTop) || 0, st = $('stage'), portrait = H > W;
+  document.body.classList.toggle('p', portrait);
+  layout(portrait);
+  // horizontal: ~1150 de alto (mínimo 1500 de ancho); vertical: 1200 × 1600
+  const h = H - top, s = portrait ? Math.min(W / 1200, h / 1600) : Math.min(h / 1150, W / 1500);
+  st.style.width = W / s + 'px';
+  st.style.height = h / s + 'px';
+  st.style.transform = `translateY(${top}px) scale(${s})`;
+}
+// Huecos según las tarjetas activas. Horizontal: 6 columnas (las de abajo se reparten a partes iguales);
+// vertical: 2 columnas, las de abajo de dos en dos
+function layout(portrait) {
+  const on = id => !$(id).hidden, kids = on('kids'), bottom = ['swap', 'luz', 'energy'].filter(on);
+  const rows = portrait
+    ? [[[['sky', 2]], 23], [kids ? [['next', 1], ['kids', 1]] : [['next', 2]], 27], [[['week', 2]], 47],
+       ...[0, 2].map(i => bottom.slice(i, i + 2)).filter(r => r.length).map(r => [r.map(id => [id, 2 / r.length]), 25])]
+    : [[[['sky', 4], ['next', 2]], 23], [kids ? [['week', 4], ['kids', 2]] : [['week', 6]], 48],
+       ...(bottom.length ? [[bottom.map(id => [id, 6 / bottom.length]), 29]] : [])];
+  const st = $('stage').style;
+  st.gridTemplateColumns = `repeat(${portrait ? 2 : 6}, minmax(0, 1fr))`;
+  st.gridTemplateRows = rows.map(r => r[1] + 'fr').join(' ');
+  st.gridTemplateAreas = rows.map(([cells]) => '"' + cells.flatMap(([id, n]) => Array(n).fill(id)).join(' ') + '"').join(' ');
+}
+// iOS, al volver una web app del segundo plano, no siempre avisa con resize: se recalcula al reaparecer y un poco después
+const refit = () => { fit(); requestAnimationFrame(fit); setTimeout(fit, 350); };
+addEventListener('resize', refit); addEventListener('orientationchange', refit); addEventListener('pageshow', refit);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refit(); });
+visualViewport?.addEventListener('resize', refit);
+new ResizeObserver(fit).observe(probe);
+
+// --- Iconos del tiempo: Meteocons (line) ---
+const ICON_URL = n => `https://cdn.jsdelivr.net/npm/@meteocons/svg-static@3.0.0-next.10/line/${n}.svg`;
+function iconName(code, day) {
+  const dn = s => s + (day ? '-day' : '-night');
+  switch (code) {
+    case 0: return dn('clear'); case 1: return dn('mostly-clear'); case 2: return dn('partly-cloudy'); case 3: return 'overcast';
+    case 45: case 48: return dn('fog');
+    case 51: case 53: case 55: return 'drizzle';
+    case 56: case 57: case 66: case 67: return 'sleet';
+    case 61: case 63: case 65: return 'rain';
+    case 71: case 73: case 75: case 77: return 'snow';
+    case 80: case 81: case 82: return dn('partly-cloudy') + '-rain';
+    case 85: case 86: return dn('partly-cloudy') + '-snow';
+    case 95: return dn('thunderstorms');
+    case 96: case 99: return dn('thunderstorms') + '-hail';
+    default: return 'overcast';
+  }
+}
+const icon = (code, day, size) => `<img src="${ICON_URL(iconName(code, day))}" width="${size}" height="${size}" alt="">`;
+
+// --- Reloj y cielo: el degradado sigue al tiempo y al momento del día ---
+let forecast = null, forecastAt = 0;
+const SKIES = {
+  dia: ['#2F6FB5', '#6FA8DC', '#A9CBEA', 'rgba(255,244,214,.45)'], nubes: ['#46698F', '#7E9DBA', '#AFC2D3', 'rgba(255,255,255,.25)'],
+  nublado: ['#56616F', '#7F8A97', '#A3ACB6', 'rgba(255,255,255,.15)'], lluvia: ['#2E3A48', '#4A5868', '#6B7887', 'rgba(160,190,230,.15)'],
+  nieve: ['#6F8399', '#9FB2C5', '#D3DEE8', 'rgba(255,255,255,.35)'], amanecer: ['#3C3B6E', '#B5617A', '#F2B47E', 'rgba(255,214,150,.55)'],
+  atardecer: ['#2B2D5C', '#A9466A', '#EE8F55', 'rgba(255,170,110,.55)'], noche: ['#0B1228', '#16224A', '#283766', 'rgba(220,230,255,.18)'],
+};
+function phase(now) {
+  const i = forecast ? forecast.daily.time.indexOf(ymd(now)) : -1;
+  const rise = i >= 0 ? new Date(forecast.daily.sunrise[i]) : new Date(+sod(now) + 8 * 36e5);
+  const set = i >= 0 ? new Date(forecast.daily.sunset[i]) : new Date(+sod(now) + 19 * 36e5);
+  const m = 6e4;
+  if (now < rise - 45 * m || now > +set + 60 * m) return 'night';
+  if (now < +rise + 60 * m) return 'dawn';
+  if (now < set - 60 * m) return 'day';
+  return 'dusk';
+}
+function sky(now) {
+  const c = forecast?.current?.weather_code ?? 0, ph = phase(now);
+  if (ph === 'night') return 'noche';
+  if ((c >= 71 && c <= 77) || c === 85 || c === 86) return 'nieve';
+  if ((c >= 51 && c <= 67) || c >= 80) return 'lluvia';
+  if (ph === 'dawn') return 'amanecer';
+  if (ph === 'dusk') return 'atardecer';
+  return c === 3 || c === 45 || c === 48 ? 'nublado' : c >= 1 ? 'nubes' : 'dia';
+}
+let shownSky = '';
+function tick() {
+  const now = new Date();
+  $('clock').textContent = hm(now);
+  $('date').innerHTML = `<b>${cap(DOW_LONG[now.getDay()])}</b><span>  ${now.getDate()} de ${MONTHS[now.getMonth()]}</span>`;
+  const s = sky(now);
+  if (s !== shownSky) {
+    shownSky = s; const [a, b, c, glow] = SKIES[s];
+    $('sky').style.background = `linear-gradient(160deg, ${a} 0%, ${b} 55%, ${c} 100%)`;
+    $('sky').style.setProperty('--glow', glow);
+  }
+}
+
+// --- Tiempo (Open-Meteo) ---
+const rain = p => `<div class="rainp ${p >= 40 ? 'hi' : ''}">💧 ${p ?? 0} %</div>`;
+async function loadWeather() {
+  const u = `https://api.open-meteo.com/v1/forecast?latitude=${cfg.lat}&longitude=${cfg.lon}&timezone=auto&forecast_days=7`
+    + '&current=temperature_2m,weather_code,is_day,relative_humidity_2m,wind_speed_10m'
+    + '&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,is_day'
+    + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset';
+  const r = await fetch(u);
+  if (!r.ok) throw new Error('tiempo ' + r.status);
+  forecast = await r.json();
+  forecastAt = Date.now();
+  shownSky = ''; tick();
+  renderWeather();
+  if ($('wxd').classList.contains('on')) renderWxd();
+}
+function renderWeather() {
+  const f = forecast, d = f.daily, now = new Date();
+  const k = d.time.indexOf(ymd(now));
+  if (k < 0) return;
+  let html = `<div class="cur">${icon(f.current.weather_code, f.current.is_day, 80)}
+    <div class="t">${deg(f.current.temperature_2m)}</div>
+    <div class="mm">${deg(d.temperature_2m_min[k])} / ${deg(d.temperature_2m_max[k])}</div>${rain(d.precipitation_probability_max[k])}</div>`;
+  html += '<div class="wxs"><div class="wxl">';
+  for (let i = k + 1; i <= k + 5 && i < d.time.length; i++) {
+    const day = new Date(d.time[i] + 'T12:00');
+    html += `<div class="chip"><div class="d">${DOW[day.getDay()]}</div>${icon(d.weather_code[i], true, 44)}
+      <div class="mx">${deg(d.temperature_2m_max[i])}</div><div class="mn">${deg(d.temperature_2m_min[i])}</div>${rain(d.precipitation_probability_max[i])}</div>`;
+  }
+  $('wx').innerHTML = html + '</div></div>';
+}
+
+// --- Tiempo en detalle (al tocar la tarjeta) ---
+const WX_TEXT = { 0: 'Despejado', 1: 'Poco nuboso', 2: 'Parcialmente nuboso', 3: 'Cubierto', 45: 'Niebla', 48: 'Niebla',
+  51: 'Llovizna', 53: 'Llovizna', 55: 'Llovizna', 56: 'Llovizna helada', 57: 'Llovizna helada', 61: 'Lluvia débil', 63: 'Lluvia',
+  65: 'Lluvia fuerte', 66: 'Lluvia helada', 67: 'Lluvia helada', 71: 'Nieve', 73: 'Nieve', 75: 'Nieve', 77: 'Nieve',
+  80: 'Chubascos débiles', 81: 'Chubascos', 82: 'Chubascos fuertes', 85: 'Chubascos de nieve', 86: 'Chubascos de nieve',
+  95: 'Tormenta', 96: 'Tormenta con granizo', 99: 'Tormenta con granizo' };
+const mm = v => v < 10 ? v.toFixed(1).replace('.', ',') : String(Math.round(v));
+// Curva suave que no se pasa de los puntos (monótona, Fritsch–Carlson)
+function smoothPath(xs, ys) {
+  const n = xs.length, m = xs.slice(1).map((x, k) => (ys[k + 1] - ys[k]) / (x - xs[k])), t = new Array(n).fill(0);
+  for (let k = 1; k < n - 1; k++) t[k] = m[k - 1] * m[k] <= 0 ? 0 : (m[k - 1] + m[k]) / 2;
+  for (let k = 0; k < n - 1; k++) {
+    if (!m[k]) { t[k] = t[k + 1] = 0; continue; }
+    const a = t[k] / m[k], b = t[k + 1] / m[k], h = a * a + b * b;
+    if (h > 9) { const f = 3 / Math.sqrt(h); t[k] = f * a * m[k]; t[k + 1] = f * b * m[k]; }
+  }
+  let d = `M${xs[0]} ${ys[0]}`;
+  for (let k = 0; k < n - 1; k++) { const c = (xs[k + 1] - xs[k]) / 3;
+    d += `C${xs[k] + c} ${ys[k] + t[k] * c} ${xs[k + 1] - c} ${ys[k + 1] - t[k + 1] * c} ${xs[k + 1]} ${ys[k + 1]}`; }
+  return d;
+}
+let wxDay = 0, wxTimer = null;
+function openWxd() { if (!forecast?.hourly) return; wxDay = 0; renderWxd(); $('wxd').classList.add('on'); wxTouch(); }
+function closeWxd() { clearTimeout(wxTimer); $('wxd').classList.remove('on'); }
+const wxTouch = () => { clearTimeout(wxTimer); wxTimer = setTimeout(closeWxd, 6e4); };   // se cierra sola al minuto
+function pickWxDay(i) { wxDay = i; renderWxd(); wxTouch(); }
+function renderWxd() {
+  const f = forecast, d = f.daily, h = f.hourly, c = f.current, now = new Date();
+  const k0 = d.time.indexOf(ymd(now)), k = Math.max(0, k0) + wxDay, day = d.time[k];
+  // la lluvia de Open-Meteo a las 06 es la de 05 a 06: la columna de las 05 toma la de la hora siguiente
+  const pts = h.time.map((t, i) => t.startsWith(day) ? i : -1).filter(i => i >= 0);
+  const W = 1400, col = W / pts.length, X = j => col * j + col / 2;
+  const temps = pts.map(i => h.temperature_2m[i]), rainAt = i => [h.precipitation[i + 1] ?? 0, h.precipitation_probability[i + 1] ?? 0];
+  const maxMm = Math.max(0, ...pts.map(i => rainAt(i)[0])), H = 440, base = H - 6;
+  const rainSpace = maxMm >= .1 ? 40 + 70 * Math.min(maxMm, 10) / 10 + 14 : 0;
+  const lo = Math.min(...temps), hi = Math.max(...temps), top = 46, bottom = base - rainSpace - 10;
+  const Y = t => bottom - (bottom - top) * (hi === lo ? .5 : (t - lo) / (hi - lo));
+  const xs = pts.map((_, j) => X(j)), ys = temps.map(Y), line = smoothPath(xs, ys);
+  const cur = wxDay === 0 ? pts.findIndex((i, j) => new Date(h.time[i]) <= now && now < new Date(h.time[pts[j + 1]] ?? Infinity)) : -1;
+  const bars = pts.map((i, j) => { const [v, p] = rainAt(i); if (v < .1) return '';
+    const bh = 34 + 70 * Math.min(v, 10) / 10, w = Math.min(46, col * .62), color = v >= 15 ? '#1D4ED8' : '#2F80ED';
+    return `<path d="M${X(j) - w / 2} ${base}V${base - bh + 10}q0 -10 10 -10h${w - 20}q10 0 10 10V${base}Z" fill="${color}" fill-opacity="${p / 100}" stroke="${color}" stroke-opacity=".35" stroke-width="2"/>
+      <text x="${X(j)}" y="${base - 10}" text-anchor="middle" font-size="18" font-weight="600" fill="${p >= 50 ? '#fff' : color}">${mm(v)}</text>`; }).join('');
+  const chart = `<svg class="ch" viewBox="0 0 ${W} ${H}">
+    <defs><linearGradient id="wg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F5A623" stop-opacity=".28"/><stop offset="1" stop-color="#F5A623" stop-opacity="0"/></linearGradient></defs>
+    ${cur >= 0 ? `<rect x="${X(cur) - col * .3}" y="10" width="${col * .6}" height="${base - 10}" rx="10" fill="#F5A623" fill-opacity=".18"/>` : ''}
+    <path d="${line}L${xs.at(-1)} ${base}L${xs[0]} ${base}Z" fill="url(#wg)"/>
+    <path d="${line}" fill="none" stroke="#E9A23B" stroke-width="5" stroke-linecap="round"/>
+    ${xs.map((x, j) => `<circle cx="${x}" cy="${ys[j]}" r="8" fill="#E9A23B" stroke="#fff" stroke-width="3"/>
+      <text x="${x}" y="${ys[j] - 20}" text-anchor="middle" font-size="24" font-weight="${j === cur ? 700 : 500}" fill="#221D18">${Math.round(temps[j])}</text>`).join('')}
+    ${bars}<line x1="0" x2="${W}" y1="${base}" y2="${base}" stroke="#EADBC6" stroke-width="2"/></svg>`;
+  const hours = `<div class="hrs" style="grid-template-columns:repeat(${pts.length},1fr)">${pts.map(i =>
+    `<div>${icon(h.weather_code[i], h.is_day[i], 52)}${h.time[i].slice(11, 13)}</div>`).join('')}</div>`;
+  const days = d.time.slice(Math.max(0, k0), Math.max(0, k0) + 7).map((t, j) => { const i = Math.max(0, k0) + j, dt = new Date(t + 'T12:00');
+    const sum = d.precipitation_sum?.[i] ?? 0, pr = d.precipitation_probability_max[i] ?? 0;
+    return `<div class="dy ${j === wxDay ? 'sel' : ''}" onclick="pickWxDay(${j})"><div class="n">${DOW[dt.getDay()].toLowerCase()} ${dt.getDate()}</div>
+      ${icon(d.weather_code[i], true, 60)}<div class="t">${deg(d.temperature_2m_max[i])}<i>${deg(d.temperature_2m_min[i])}</i></div>
+      <div class="r">${sum >= .1 ? `🌧 ${mm(sum)} mm · ${pr}%` : pr >= 3 ? `🌧 ${pr}%` : ''}</div></div>`; }).join('');
+  const sel = wxDay === 0, code = sel ? c.weather_code : d.weather_code[k], sum = d.precipitation_sum?.[k] ?? 0;
+  $('wxd').querySelector('.box').innerHTML = `<b class="x" onclick="closeWxd()">✕</b>
+    <div class="hd">${icon(code, sel ? c.is_day : 1, 120)}<div class="now">${deg(sel ? c.temperature_2m : d.temperature_2m_max[k])}</div>
+      <div class="ds"><b>${WX_TEXT[code] ?? '—'}</b><span>${sel ? esc(cfg.place || '') : DOW_LONG[new Date(day + 'T12:00').getDay()]} · Máx ${deg(d.temperature_2m_max[k])} · Mín ${deg(d.temperature_2m_min[k])}</span></div>
+      <div class="chips"><div class="chip2"><span class="ic">🌧</span>${mm(sum)} <small>mm</small> · ${d.precipitation_probability_max[k] ?? 0}<small>%</small></div>
+        ${sel ? `<div class="chip2"><span class="ic">💧</span>${Math.round(c.relative_humidity_2m)}<small>%</small></div>
+        <div class="chip2"><span class="ic">💨</span>${Math.round(c.wind_speed_10m)} <small>km/h</small></div>` : ''}</div></div>
+    ${chart}${hours}<div class="hr0"></div><div class="days">${days}</div>`;
+}
+
+// --- Calendarios de Google (enlace iCal privado, leído por la función del servidor) ---
+let events = [];
+async function loadEvents() {
+  const from = sod(new Date()), to = addDays(from, 10), bad = [];
+  const lists = await Promise.all((cfg.cals || []).map(c =>
+    proxy({ cal: c.url, desde: from.toISOString(), hasta: to.toISOString() }).then(j => j.events.map(e => ({
+      title: e.title, allDay: e.allDay, color: c.color, cal: c.name, place: e.place,
+      // día entero: la fecha en hora local (new Date('2026-10-21') la tomaría en UTC)
+      start: new Date(e.allDay ? e.start + 'T00:00' : e.start), end: new Date(e.allDay ? e.end + 'T00:00' : e.end),
+    }))).catch(err => { bad.push(c.name + ': ' + err.message); return null; })));
+  // si falla un calendario se queda lo último que se leyó de él
+  events = lists.flatMap((l, i) => l ?? events.filter(e => e.cal === cfg.cals[i].name)).sort((a, b) => a.start - b.start);
+  renderEvents();
+  if (bad.length) throw new Error(bad.join(' · '));
+}
+function relDay(d, now) {
+  const diff = Math.round((sod(d) - sod(now)) / 864e5);
+  return diff === 0 ? 'Hoy' : diff === 1 ? 'Mañana' : cap(DOW_LONG[d.getDay()]);
+}
+// «en 25 min», «en 3 h 10 min», «mañana», «el viernes»
+function countdown(now, at) {
+  const mins = Math.ceil((at - now) / 6e4);
+  if (mins < 60) return `en ${mins} min`;
+  if (mins < 1440) return `en ${Math.floor(mins / 60)} h${mins % 60 ? ' ' + (mins % 60) + ' min' : ''}`;
+  const day = relDay(at, now).toLowerCase();
+  return day === 'hoy' || day === 'mañana' ? day : 'el ' + day;
+}
+// Lo próximo: uno por calendario (o lo que está pasando), rotando cada 4 s con fundido y cambio de color
+let nexts = [], nextIdx = 0;
+function paintNext() {
+  const el = $('next'), now = new Date();
+  if (!nexts.length) { el.className = 'next none'; el.style.background = ''; el.style.color = ''; el.textContent = (cfg.cals || []).length ? 'Semana sin citas' : 'Sin calendarios'; return; }
+  const next = nexts[nextIdx %= nexts.length], live = next.start <= now;
+  const ink = onColor(next.color), wash = ink === '#fff' ? 'rgba(255,255,255,.2)' : 'rgba(34,29,24,.12)';
+  el.className = 'next'; el.style.background = next.color; el.style.color = ink;
+  el.innerHTML = `<div class="nx"><div class="top"><div class="lbl">${live ? '● AHORA' : 'LO PRÓXIMO'}<span class="cal" style="background:${wash}">${esc(next.cal)}</span></div>
+      <div class="left" style="background:${wash}">${live ? 'hasta ' + hm(next.end) : countdown(now, next.start)}</div></div>
+      <div class="tt">${esc(next.title)}</div>
+      <div class="when">${relDay(next.start, now)} · ${hm(next.start)}–${hm(next.end)}${next.place ? ' · ' + esc(next.place.split(',')[0]) : ''}</div></div>`
+    + (nexts.length > 1 ? `<div class="dots">${nexts.map((e, i) => `<i class="${i === nextIdx ? 'on' : ''}" style="background:${ink}"></i>`).join('')}</div>` : '');
+}
+setInterval(() => {
+  if (nexts.length < 2) return;
+  document.querySelector('#next .nx')?.classList.add('out');                       // sale hacia arriba…
+  setTimeout(() => { nextIdx++; paintNext(); document.querySelector('#next .nx')?.classList.add('in'); }, 450);   // …y entra desde abajo
+}, 4000);
+function renderEvents() {
+  const now = new Date(), today = sod(now), timed = events.filter(e => !e.allDay);
+  nexts = (cfg.cals || []).map(({ name }) => {
+    const mine = timed.filter(e => e.cal === name);
+    return mine.find(e => e.start <= now && e.end > now) || mine.find(e => e.start > now);
+  }).filter(Boolean);
+  paintNext();
+  let html = '';
+  for (let i = 0; i < 10; i++) {
+    const d = addDays(today, i), dEnd = addDays(today, i + 1);
+    const day = events.filter(e => e.start < dEnd && e.end > d), allDay = day.filter(e => e.allDay), list = day.filter(e => !e.allDay);
+    html += `<div class="day ${i ? '' : 'today'}"><div class="hd"><div class="n">${i ? DOW[d.getDay()] : 'Hoy'}</div><div class="num">${d.getDate()}</div></div>`
+      + '<div class="hair"></div>'
+      + allDay.map(e => `<div class="allday" style="background:${e.color};color:${onColor(e.color)}">${esc(e.title)}</div>`).join('')
+      + '<div class="evs">'
+      + (list.length ? list.map(e => `<div class="ev ${e.end <= now ? 'past' : ''}"><div class="bar" style="background:${e.color}"></div>
+          <div class="body"><div class="h">${hm(e.start)}</div><div class="t">${esc(e.title)}</div></div></div>`).join('') : '<div class="dash">—</div>')
+      + '</div></div>';
+  }
+  $('week').innerHTML = html;
+}
+// Tras deslizar a los 5 días siguientes, vuelve sola a hoy a los 30 s
+let weekBack = null;
+$('week').addEventListener('scroll', () => {
+  clearTimeout(weekBack);
+  weekBack = setTimeout(() => $('week').scrollTo({ left: 0, behavior: 'smooth' }), 3e4);
+}, { passive: true });
+// Ratón (ordenador sin pantalla táctil): arrastrar pasa de página; el scroll sin barra no se puede arrastrar
+function mouseSwipe(el) {
+  let x0 = null, moved = false;
+  el.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') { x0 = e.clientX; moved = false; } });
+  el.addEventListener('pointermove', e => { if (x0 != null && Math.abs(e.clientX - x0) > 10) moved = true; });
+  window.addEventListener('pointerup', e => {
+    if (x0 == null) return;
+    const dx = e.clientX - x0; x0 = null;
+    if (Math.abs(dx) > 40) el.scrollBy({ left: dx < 0 ? el.clientWidth : -el.clientWidth, behavior: 'smooth' });
+  });
+  el.addEventListener('click', e => { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; } }, true);
+  el.addEventListener('dragstart', e => e.preventDefault());
+}
+mouseSwipe($('week'));
+
+// --- Talentos: saldos del tablero público (por la función del servidor), cada 30 s ---
+const KID_COLORS = ['#E8743B', '#29A3D6', '#8E5BC8', '#3BA55C'];
+const fmtPts = n => n < 0 ? '−' + -n : String(n);
+let talentos = [], kidKey = null, kidPrev = {};
+async function loadKids() {
+  talentos = (await proxy({ tablero: cfg.talentos.code })).kids || [];
+  renderKids();
+}
+// Se pinta una vez y luego solo cambian los números: así un repintado no corta una animación a medias
+function renderKids() {
+  const el = $('kids'), key = talentos.map(t => t.name + t.avatar + t.photo + t.color).join('|');
+  if (key !== kidKey) {
+    kidKey = key; kidPrev = {};
+    el.innerHTML = `<div class="th">⭐<span style="color:#C98A0E">TALENTOS</span></div><div class="kg">${talentos.map((t, i) => {
+      const c = /^#[0-9a-f]{6}$/i.test(t.color) ? t.color : KID_COLORS[i % KID_COLORS.length];
+      const face = t.photo ? `<img src="${esc(t.photo)}" alt=""><i class="bub">${esc(t.avatar || '⭐')}</i>` : esc(t.avatar || '⭐');
+      return `<div class="kid" style="--c:${c};background:${c}1F"><div class="av${t.photo ? ' ph' : ''}">${face}</div>
+        <div class="nm">${esc(t.name || '')}</div><div class="bal"><b></b><small>⭐</small></div></div>`;
+    }).join('') || '<div class="dash">—</div>'}</div>`;
+  }
+  const cells = el.querySelectorAll('.kid');
+  talentos.forEach((t, i) => {
+    const before = kidPrev[t.name], cell = cells[i];
+    kidPrev[t.name] = t.balance;
+    if (before === undefined) return setBal(cell, t.balance);
+    if (before !== t.balance) celebrate(cell, before, t.balance);
+  });
+}
+function setBal(cell, n) {
+  cell.querySelector('.bal b').textContent = fmtPts(n);
+  cell.querySelector('.bal').classList.toggle('neg', n < 0);
+}
+// Ganar: la casilla salta, el número sube contando, «+N» vuela y saltan estrellas. Perder: tiembla y «−N» cae en rojo
+function celebrate(cell, from, to) {
+  const d = to - from, up = d > 0, t0 = performance.now(), dur = Math.min(1500, 400 + Math.abs(d) * 120);
+  const step = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - (1 - k) ** 3;
+    setBal(cell, Math.round(from + d * e)); if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+  cell.classList.remove('win', 'lose'); void cell.offsetWidth; cell.classList.add(up ? 'win' : 'lose');
+  const fly = document.createElement('div');
+  fly.className = 'fly ' + (up ? 'up' : 'down'); fly.textContent = (up ? '+' : '−') + Math.abs(d);
+  cell.append(fly);
+  if (up) for (let i = 0; i < 12; i++) {
+    const s = document.createElement('i'), a = Math.PI * 2 * i / 12 + Math.random() * .4, r = 110 + Math.random() * 70;
+    s.className = 'spark'; s.textContent = i % 3 ? '⭐' : '✨';
+    s.style.cssText = `--x:${Math.cos(a) * r}px;--y:${Math.sin(a) * r}px;animation-delay:${Math.random() * 120}ms`;
+    cell.append(s);
+  }
+  setTimeout(() => { cell.querySelectorAll('.fly, .spark').forEach(n => n.remove()); cell.classList.remove('win', 'lose'); }, 2200);
+}
+// Al tocar Talentos: el tablero completo de la app
+let tbdTimer = null;
+function openTbd() {
+  $('tbd').querySelector('.box').innerHTML = `<iframe src="https://lostalentos.vercel.app/tablero/${encodeURIComponent(cfg.talentos.code)}" title="Talentos"></iframe><b class="x" onclick="closeTbd()">✕</b>`;
+  $('tbd').classList.add('on');
+  clearTimeout(tbdTimer); tbdTimer = setTimeout(closeTbd, 3 * 6e4);    // ponytail: los toques dentro del iframe no llegan aquí; se cierra a los 3 min
+}
+function closeTbd() { clearTimeout(tbdTimer); $('tbd').classList.remove('on'); $('tbd').querySelector('.box').innerHTML = ''; }
+
+// --- Cuenta atrás (cumpleaños, viaje, un bebé…): días que faltan y barra desde que se configuró ---
+function renderCountdown() {
+  const c = cfg.countdown, due = new Date(c.date + 'T00:00'), left = Math.round((due - sod(new Date())) / 864e5);
+  const since = new Date((c.since || c.date) + 'T00:00'), total = Math.max(1, Math.round((due - since) / 864e5));
+  const pct = Math.max(0, Math.min(100, (1 - left / total) * 100)), e = esc(c.emoji || '🎉');
+  const big = left > 0 ? `<div class="bn">${left}</div><div class="bl">${left === 1 ? 'día' : 'días'}</div>` : `<div class="bn">${e}</div>`;
+  const msg = left > 1 ? `para ${esc(c.title)}` : left === 1 ? `¡Mañana! ${esc(c.title)}` : left === 0 ? `¡Hoy! ${esc(c.title)}` : esc(c.title);
+  $('cdown').innerHTML = `<span class="twinkle s1">✦</span><span class="twinkle s2">✧</span><span class="twinkle s3">☁︎</span>
+    <div class="th">${e}<span style="color:#5B7FD6">CUENTA ATRÁS</span></div>
+    <div class="bb"><div class="bcount">${big}</div>
+      <div class="binfo"><div class="bmsg">${msg}</div>
+        <div class="bdate">${due.getDate()} de ${MONTHS[due.getMonth()]}${due.getFullYear() !== new Date().getFullYear() ? ' de ' + due.getFullYear() : ''}</div>
+        <div class="bbar"><div style="width:${pct}%"></div><span class="beat" style="left:${pct}%">${e}</span></div></div></div>`;
+  return left >= 0;
+}
+
+// --- Fútbol: último partido (o el que se está jugando) y los 3 siguientes de todas sus competiciones (ESPN) ---
+const COMPS = { 'esp.1': 'LaLiga', 'esp.2': 'LaLiga 2', 'uefa.champions': 'Champions', 'uefa.europa': 'Europa League',
+  'uefa.europa.conf': 'Conference', 'esp.copa_del_rey': 'Copa del Rey', 'esp.super_cup': 'Supercopa' };
+const crest = id => `https://a.espncdn.com/combiner/i?img=/i/teamlogos/soccer/500/${id}.png&w=96&h=96`;
+let matches = [], matchesAt = 0;
+async function loadMatches() {
+  const live = matches.some(m => m.state === 'in' || (m.state === 'pre' && m.date - Date.now() < 15 * 6e4));
+  if (Date.now() - matchesAt < (live ? 1 : 30) * 6e4) return;           // en directo, cada minuto
+  const T = cfg.team.id, comps = [cfg.team.league, ...Object.keys(COMPS).filter(c => !c.startsWith('esp.') || c.includes('_'))];
+  const urls = comps.flatMap(c => ['', '?fixture=true'].map(q => [c, `https://site.api.espn.com/apis/site/v2/sports/soccer/${c}/teams/${T}/schedule${q}`]));
+  const got = await Promise.all(urls.map(([c, u]) => fetch(u).then(r => r.ok ? r.json() : { events: [] }).then(j => (j.events || []).map(e => [c, e])).catch(() => [])));
+  const byId = {};
+  for (const [c, e] of got.flat()) {
+    const k = e.competitions?.[0]; if (!k) continue;
+    const t = k.competitors.map(x => ({ id: x.team.id, name: x.team.shortDisplayName, home: x.homeAway === 'home',
+      score: x.score == null ? null : (typeof x.score === 'object' ? x.score.displayValue : x.score) }));
+    byId[e.id] = { id: e.id, lg: c, date: new Date(e.date), comp: COMPS[c], state: k.status.type.state, status: k.status.type.name, clock: k.status.displayClock,
+      home: t.find(x => x.home), away: t.find(x => !x.home) };
+  }
+  if (!Object.keys(byId).length) throw new Error('partidos');
+  matches = Object.values(byId).sort((a, b) => a.date - b.date);
+  matchesAt = Date.now();
+  renderMatches();
+}
+const shortDate = d => `${DOW[d.getDay()]} ${d.getDate()} · ${hm(d)}`;
+function renderMatches() {
+  const T = cfg.team.id, last = matches.find(m => m.state === 'in') || [...matches].reverse().find(m => m.state === 'post');
+  const next = matches.filter(m => m.state === 'pre').slice(0, 3);
+  let lastHtml = '';
+  if (last) {
+    const me = last.home.id === T ? last.home : last.away, rival = me === last.home ? last.away : last.home;
+    const a = +me.score, b = +rival.score;
+    const res = last.state === 'in' ? '' : a > b ? ['VICTORIA', '#3BA55C'] : a === b ? ['EMPATE', '#A6998A'] : ['DERROTA', '#D9483B'];
+    const k = last.state === 'in' ? `<div class="k live">● ${last.status === 'STATUS_HALFTIME' ? 'DESCANSO' : 'EN DIRECTO · ' + esc(last.clock)}</div>` : '<div class="k">ÚLTIMO PARTIDO</div>';
+    lastHtml = `<div class="last" onclick="openRmd()">${k}
+      <div class="score"><img src="${crest(last.home.id)}" alt=""><b>${esc(last.home.score)}–${esc(last.away.score)}</b><img src="${crest(last.away.id)}" alt=""></div>
+      ${res ? `<span class="res" style="background:${res[1]}">${res[0]}</span>` : ''}
+      <div class="meta">${esc(last.comp)} · ${last.date.getDate()} ${MONTHS[last.date.getMonth()].slice(0, 3)}</div></div>`;
+  }
+  const nextHtml = next.map(m => {
+    const homeGame = m.home.id === T, rival = homeGame ? m.away : m.home;
+    return `<div class="fx"><img src="${crest(rival.id)}" alt=""><div style="min-width:0">
+      <div class="who">${esc(rival.name)} <span class="ha">(${homeGame ? 'L' : 'V'})</span></div>
+      <div class="when">${shortDate(m.date)} · ${esc(m.comp)}</div></div></div>`;
+  }).join('');
+  $('rm').innerHTML = `<img class="wm" src="${crest(T)}" alt="">
+    <div class="th">⚽<span>${esc(cfg.team.name.toUpperCase())}</span></div>
+    <div class="cols">${lastHtml}<div class="next2"><div class="k2">PRÓXIMOS</div>${nextHtml || '<div class="sub">Sin partidos anunciados</div>'}</div></div>`;
+  swapDots();
+  if (matches.some(m => m.state === 'in') || !hasCd()) swapShow(1);    // empieza el partido (o no hay cuenta atrás): a su tarjeta ya
+}
+// Colores de la tarjeta: el más oscuro de los dos del equipo para el fondo del resultado (blanco del Madrid → su verde)
+function teamColors() {
+  const [a, b] = [cfg.team.color, cfg.team.alt].map(c => /^[0-9a-f]{6}$/i.test(c || '') ? '#' + c : '#3D195B');
+  let [dark, light] = lum(a) <= lum(b) ? [a, b] : [b, a];
+  if (lum(dark) > 140) dark = mix(dark, '#000000', .55);
+  $('rm').style.setProperty('--tc', dark); $('rm').style.setProperty('--ta', light);
+}
+// Al tocar el resultado: goles, tarjetas y estadísticas (resumen de ESPN, se pide al abrir)
+let rmdTimer = null;
+function closeRmd() { clearTimeout(rmdTimer); $('rmd').classList.remove('on'); }
+async function openRmd() {
+  const T = cfg.team.id, m = matches.find(m => m.state === 'in') || [...matches].reverse().find(m => m.state === 'post');
+  if (!m) return;
+  const box = $('rmd').querySelector('.box'), x = '<b class="x" onclick="closeRmd()">✕</b>';
+  box.innerHTML = x + '<div class="mt">Cargando…</div>';
+  $('rmd').classList.add('on'); clearTimeout(rmdTimer); rmdTimer = setTimeout(closeRmd, 9e4);
+  let j;
+  try { j = await (await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${m.lg}/summary?event=${m.id}`)).json(); }
+  catch { box.innerHTML = x + '<div class="mt">No se pudo cargar el partido</div>'; return; }
+  const name = id => (j.boxscore?.teams || []).find(t => t.team.id === id)?.team.displayName || (id === m.home.id ? m.home.name : m.away.name);
+  // goles y rojas a su lado; participants[0] es el autor, [1] la asistencia
+  const ev = (j.keyEvents || []).filter(e => e.scoringPlay || e.type?.text === 'Red Card').map(e => {
+    const p = (e.participants || []).map(x => x.athlete.displayName), t = e.type.text;
+    const tag = t === 'Red Card' ? '🟥' : '⚽', extra = /Own Goal/.test(t) ? 'en propia' : /Penalty/.test(t) ? 'penalti' : p[1] ? 'asist. ' + p[1] : '';
+    return { home: e.team?.id === m.home.id, html: `${tag} ${esc(p[0] || '')}<b>${esc(e.clock?.displayValue || '')}</b>${extra ? `<small>${esc(extra)}</small>` : ''}` };
+  });
+  const rows = [], hs = ev.filter(e => e.home), as = ev.filter(e => !e.home);
+  for (let i = 0; i < Math.max(hs.length, as.length); i++) rows.push(`<div class="g r">${hs[i]?.html || ''}</div><div class="g a">${as[i]?.html || ''}</div>`);
+  const stat = (t, k) => (j.boxscore?.teams || []).find(x => x.team.id === t)?.statistics.find(s => s.name === k)?.displayValue;
+  const STATS = [['possessionPct', 'Posesión', '%'], ['totalShots', 'Tiros'], ['shotsOnTarget', 'A puerta'], ['wonCorners', 'Córners'],
+    ['saves', 'Paradas'], ['foulsCommitted', 'Faltas'], ['yellowCards', 'Amarillas'], ['offsides', 'Fueras de juego']];
+  const tc = getComputedStyle($('rm')).getPropertyValue('--tc').trim(), [cA, cB] = m.home.id === T ? [tc, '#C9BBA8'] : ['#C9BBA8', tc];
+  const stats = STATS.map(([k, l, u = '']) => {
+    const a = stat(m.home.id, k), b = stat(m.away.id, k); if (a == null || b == null) return '';
+    const fa = parseFloat(a), fb = parseFloat(b), pa = fa + fb ? fa / (fa + fb) * 100 : 50;
+    return `<div class="sr"><div class="l">${l}</div><div class="v">${Math.round(fa)}${u}</div><div class="bar"><i style="width:${pa}%;background:${cA}"></i><i style="flex:1;background:${cB}"></i></div><div class="v">${Math.round(fb)}${u}</div></div>`;
+  }).join('');
+  const gi = j.gameInfo || {}, d = m.date;
+  const meta = [m.comp, `${DOW[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)} · ${hm(d)}`, gi.venue?.fullName,
+    gi.attendance ? gi.attendance.toLocaleString('es-ES') + ' espectadores' : ''].filter(Boolean).map(esc).join(' · ');
+  const live = m.state === 'in' ? `<div class="mt" style="color:#FF5A5F;font-weight:700">● ${m.status === 'STATUS_HALFTIME' ? 'DESCANSO' : 'EN DIRECTO · ' + esc(m.clock)}</div>` : '';
+  box.innerHTML = `${x}<div class="sc">
+      <div><img src="${crest(m.home.id)}" alt=""><div class="tn">${esc(name(m.home.id))}</div></div>
+      <div class="big">${esc(m.home.score)}–${esc(m.away.score)}</div>
+      <div><img src="${crest(m.away.id)}" alt=""><div class="tn">${esc(name(m.away.id))}</div></div></div>
+    ${live}<div class="mt">${meta}</div>
+    ${rows.length ? `<div class="hr0"></div><div class="gl">${rows.join('')}</div>` : ''}
+    ${stats ? `<div class="hr0"></div><div class="sts">${stats}</div>` : ''}`;
+}
+
+// --- Hueco compartido cuenta atrás ⇄ fútbol: cada 7 s; con partido en directo, fijo en el fútbol ---
+const hasCd = () => !!cfg.countdown && !$('cdown').hidden, hasRm = () => !!cfg.team && matches.length > 0;
+function swapShow(i) {
+  if (i === 0 && !hasCd()) i = 1; if (i === 1 && !hasRm()) i = 0;
+  $('cdown').classList.toggle('off', i === 1); $('rm').classList.toggle('off', i === 0);
+  [...$('sdots').children].forEach((d, k) => d.classList.toggle('on', k === i));
+}
+const swapDots = () => { $('sdots').hidden = !(hasCd() && hasRm()); };
+(() => {
+  let x0 = null, moved = false;
+  $('swap').addEventListener('pointerdown', e => { x0 = e.clientX; moved = false; });
+  $('swap').addEventListener('pointermove', e => { if (x0 != null && Math.abs(e.clientX - x0) > 10) moved = true; });
+  window.addEventListener('pointerup', e => {
+    if (x0 == null) return;
+    const dx = e.clientX - x0; x0 = null;
+    if (Math.abs(dx) > 40) swapShow($('rm').classList.contains('off') ? 1 : 0);
+  });
+  window.addEventListener('pointercancel', () => { x0 = null; });
+  $('swap').addEventListener('click', e => { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; } }, true);
+})();
+setInterval(() => {
+  if (!(hasCd() && hasRm())) return;
+  swapShow(matches.some(m => m.state === 'in') || $('rm').classList.contains('off') ? 1 : 0);
+}, 7000);
+
+// --- Luz: precio PVPC por horas (Red Eléctrica, sin clave) o tarifa con tramos fijos ---
+let luz = [], luzAt = 0;
+async function loadLuz() {
+  if (cfg.luz.tarifa !== 'pvpc') return renderLuz();
+  const t = sod(new Date()), f = d => ymd(d) + 'T00:00', g = d => ymd(d) + 'T23:59';
+  const r = await fetch(`https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real?start_date=${f(t)}&end_date=${g(addDays(t, 1))}&time_trunc=hour`);
+  if (!r.ok) throw new Error('luz ' + r.status);
+  const pvpc = (await r.json()).included?.find(i => i.type === 'PVPC');
+  if (!pvpc) throw new Error('luz sin PVPC');
+  luz = pvpc.attributes.values.map(v => ({ t: Date.parse(v.datetime), p: v.value / 1000 }));   // €/MWh → €/kWh
+  luzAt = Date.now();
+  renderLuz();
+}
+const kwh = p => p.toFixed(3).replace('.', ',');
+const cuando = (t, now) => { const d = new Date(t), h = p2(d.getHours()) + ':00';
+  return t <= now ? 'ahora' : sod(d) > sod(new Date(now)) ? 'mañana ' + h : 'a las ' + h; };
+function renderLuz() {
+  const now = Date.now(), el = $('luz'), apps = cfg.luz.aparatos || [];
+  const PER = { valle: ['Valle', '#3BA55C'], llano: ['Llano', '#F5A623'], punta: ['Punta', '#D9483B'] };
+  if (cfg.luz.tarifa === 'tramos') {
+    const p = periodo(new Date()), [pn, pc] = PER[p], v = siguienteValle(new Date());
+    const wait = Math.round((v - now) / 6e4), today = sod(new Date()), hr = new Date().getHours();
+    const strip = [...Array(24)].map((_, h) => { const c = PER[periodo(new Date(+today + h * 36e5))][1];
+      return `<i class="${h === hr ? 'cur' : ''}" style="background:${c}${h < hr ? '55' : ''}"></i>`; }).join('');
+    el.innerHTML = `<div class="th">⚡<span style="color:#C98A0E">LUZ · TRAMOS</span></div>
+      <div class="per" style="color:${pc}">${pn}<small>${p === 'valle' ? 'lo más barato, ahora' : `valle en ${wait >= 60 ? Math.floor(wait / 60) + ' h ' : ''}${wait % 60} min`}</small></div>
+      <div class="strip">${strip}</div><div class="hrs"><span>0</span><span>6</span><span>12</span><span>18</span><span>24</span></div>
+      <div class="apps">${apps.map(a => `<div class="app">${esc(a.emoji)} ${esc(a.name)} <small>${p === 'valle' ? 'ahora' : cuando(+v, now)}</small></div>`).join('')}</div>`;
+    return;
+  }
+  if (!luz.length) return;
+  // con los precios de mañana publicados (~20:30), las 24 h que vienen; si no, el día de hoy
+  const hora = now - now % 36e5, tomorrow = luz.some(x => x.t >= +addDays(sod(new Date()), 1));
+  const bars = tomorrow ? luz.filter(x => x.t >= hora).slice(0, 24) : luz.filter(x => x.t < +addDays(sod(new Date()), 1));
+  const ps = bars.map(x => x.p), min = Math.min(...ps), max = Math.max(...ps), cur = luz.find(x => x.t === hora);
+  const chart = `<div class="bars">${bars.map(x => `<i class="${x.t < hora ? 'past' : x.t === hora ? 'cur' : ''}"
+      style="height:${12 + 88 * (max > min ? (x.p - min) / (max - min) : .5)}%;background:${priceColor(x.p, min, max)}"></i>`).join('')}</div>
+    <div class="lbls">${bars.map(x => { const h = new Date(x.t).getHours(); return `<span>${h % 3 ? '' : h}</span>`; }).join('')}</div>`;
+  const chips = apps.map(a => { const b = mejorTramo(luz, +a.h || 1, now);
+    return b ? `<div class="app" style="background:${priceColor(b.media, min, max)}22">${esc(a.emoji)} ${esc(a.name)} <small>${cuando(b.t, now)}</small></div>` : ''; }).join('');
+  el.innerHTML = `<div class="th">⚡<span style="color:#C98A0E">LUZ</span>${cur ? `<div class="now" style="color:${priceColor(cur.p, min, max)}">${kwh(cur.p)} <small>€/kWh ahora</small></div>` : ''}</div>
+    ${chart}<div class="apps">${chips}</div>`;
+}
+
+// --- Gasolina: las gasolineras elegidas, de la más barata a la más cara (Geoportal del Ministerio) ---
+const FUELS = { 'Precio Gasolina 95 E5': 'GASOLINA 95', 'Precio Gasolina 98 E5': 'GASOLINA 98', 'Precio Gasoleo A': 'DIÉSEL' };
+const num = v => v ? parseFloat(v.replace(',', '.')) : NaN;
+function km(la1, lo1, la2, lo2) {
+  const r = x => x * Math.PI / 180, a = Math.sin(r(la2 - la1) / 2) ** 2 + Math.cos(r(la1)) * Math.cos(r(la2)) * Math.sin(r(lo2 - lo1) / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(a));
+}
+// «CALLE FRANCISCO UMBRAL, 2» → «Francisco Umbral, 2»
+const street = d => d.toLowerCase().replace(/^(calle|cl|avenida|av|avda|paseo|glorieta|carretera|ctra|plaza)\.?\s+/, '').replace(/(^|\s)\S/g, c => c.toUpperCase());
+async function provincia(prov, fuel, lat, lon) {
+  const r = await fetch(`https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/FiltroProvincia/${prov}`);
+  if (!r.ok) throw new Error('gasolina ' + r.status);
+  return (await r.json()).ListaEESSPrecio.map(e => ({ id: e['IDEESS'], name: e['Rótulo'].trim(), addr: street(e['Dirección']), town: e['Localidad'],
+    p: num(e[fuel]), d: km(lat, lon, num(e['Latitud']), num(e['Longitud (WGS84)'])) })).filter(e => e.p > 0);
+}
+let stations = null, stationsAt = 0;
+async function loadGas() {
+  if (Date.now() - stationsAt < 60 * 6e4 && stations) return;
+  stations = await provincia(cfg.gas.prov, cfg.gas.fuel, cfg.lat, cfg.lon); stationsAt = Date.now();
+  const list = stations.filter(e => cfg.gas.ids.includes(e.id)).sort((a, b) => a.p - b.p || a.d - b.d);
+  const near = list.reduce((a, b) => (!a || b.d < a.d ? b : a), null);
+  const ps = list.map(e => e.p), min = Math.min(...ps), max = Math.max(...ps), eur = p => p.toFixed(3).replace('.', ',');
+  $('energy').innerHTML = `<div class="th">⛽<span style="color:var(--warm)">${FUELS[cfg.gas.fuel] || 'GASOLINA'}</span></div>
+    <div class="gas">${list.map((e, i) => {
+      const c = priceColor(e.p, min, max);
+      const tag = i === 0 && list.length > 1 ? '<span class="tag" style="background:#3BA55C">MÁS BARATA</span>'
+        : e === near ? '<span class="tag" style="background:#A6998A">MÁS CERCA</span>' : '';
+      return `<div class="st" style="background:${c}1F"><div class="logo">${esc(e.name[0] || '?')}</div>
+        <div class="sinfo"><div class="sname">${esc(e.name)}</div><div class="sa">${tag}${e.d.toFixed(1).replace('.', ',')} km · ${esc(e.addr)}</div></div>
+        <div class="sprice" style="color:${c}">${eur(e.p)}<small>€/l</small></div></div>`;
+    }).join('') || '<div class="sub">Sin precios ahora mismo</div>'}</div>`;
+}
+
+// --- Arranque y refresco: cada bloque falla por su cuenta y se queda lo último pintado ---
+function cards() {
+  $('kids').hidden = !cfg.talentos?.code;
+  $('luz').hidden = !cfg.luz?.tarifa || cfg.luz.tarifa === 'fija';
+  $('energy').hidden = !cfg.gas?.ids?.length;
+  $('cdown').hidden = !(cfg.countdown?.date && renderCountdown());
+  $('swap').hidden = $('cdown').hidden && !cfg.team;
+  if (cfg.team) teamColors();
+  swapDots(); swapShow(0); fit();
+}
+async function refresh() {
+  const jobs = [['calendarios', loadEvents()]];
+  if (Date.now() - forecastAt > 30 * 6e4) jobs.push(['tiempo', loadWeather()]);
+  if (cfg.team) jobs.push(['fútbol', loadMatches()]);
+  if (!$('luz').hidden && Date.now() - luzAt > 15 * 6e4) jobs.push(['luz', loadLuz()]);
+  if (!$('energy').hidden) jobs.push(['gasolina', loadGas()]);
+  const res = await Promise.allSettled(jobs.map(j => j[1]));
+  const bad = res.map((r, i) => r.status === 'rejected' ? jobs[i][0] + ' (' + r.reason.message + ')' : '').filter(Boolean);
+  $('status').className = bad.length ? 'err' : '';
+  $('status').textContent = bad.length ? 'Sin datos: ' + bad.join(', ') : '';
+}
+function start() {
+  cards(); tick();
+  refresh(); setInterval(refresh, 3 * 6e4);                            // calendarios cada 3 min; lo demás se frena solo
+  if (cfg.talentos?.code) { const k = () => loadKids().catch(() => {}); k(); setInterval(k, 3e4); }
+  if (cfg.team) setInterval(() => loadMatches().catch(() => {}), 6e4);   // 1 min en directo, 30 min si no
+  setInterval(() => {
+    tick();
+    if (new Date().getSeconds() === 0) {                                // cada minuto: pasados, cuenta atrás y barras de la luz
+      renderEvents();
+      if (!$('luz').hidden) renderLuz();
+      if (cfg.countdown?.date && $('cdown').hidden !== !renderCountdown()) cards();
+    }
+  }, 1000);
+}
+
+// La página se renueva sola si hay una versión nueva desplegada (la app de pantalla de inicio puede pasar semanas abierta)
+let pageTag = null;
+async function checkUpdate() {
+  const r = await fetch(location.pathname, { cache: 'no-cache' }).catch(() => null);
+  const tag = r?.ok && (r.headers.get('ETag') || r.headers.get('Last-Modified'));
+  if (!tag) return;
+  if (pageTag && tag !== pageTag && $('setup').hidden) location.reload();
+  pageTag = tag;
+}
+checkUpdate(); setInterval(checkUpdate, 10 * 6e4);
+// ponytail: recarga entera a las 4:00 para no acumular memoria en Safari tras días encendido
+setInterval(() => { const n = new Date(); if (n.getHours() === 4 && n.getMinutes() === 0 && $('setup').hidden) location.reload(); }, 6e4);
+
+// =====================================================================================================
+// --- Asistente: la primera vez (o desde ⚙︎). Trabaja sobre una copia (draft) y al final la guarda y recarga ---
+// =====================================================================================================
+let draft = null, stepIdx = 0, gasList = null, teamsCache = {};
+const LEAGUES = { 'esp.1': 'Primera División', 'esp.2': 'Segunda División' };
+const DEFAULT_APPS = [{ emoji: '🧺', name: 'Lavadora', h: 2 }, { emoji: '🍽️', name: 'Lavavajillas', h: 3 }, { emoji: '🚗', name: 'Coche', h: 5 }];
+const PALETTE = ['#D9483B', '#EE7A2B', '#F2B705', '#3BA55C', '#29A3D6', '#8E5BC8', '#E5579A'];
+const val = id => $(id)?.value.trim() ?? '';
+const say = (msg, ok) => { const e = $('serr'); if (e) { e.className = ok ? 'err ok' : 'err'; e.textContent = msg || ''; } };
+function openSetup() {
+  draft = JSON.parse(JSON.stringify(cfg || { cals: [{ name: 'Familia', color: PALETTE[2], url: '' }] }));
+  stepIdx = 0; $('setup').hidden = false; drawStep();
+}
+const enabledToggle = (key, label) => `<label class="tog"><input type="checkbox" id="on" ${draft[key] ? 'checked' : ''} onchange="toggleCard('${key}', this.checked)"> ${label}</label>`;
+function toggleCard(key, on) { if (on) draft[key] = draft[key] || STEPS.find(s => s.key === key).empty(); else delete draft[key]; drawStep(); }
+
+const STEPS = [
+  { // 1. Clave
+    title: 'Hola 👋', html: () => `
+      <p>Vamos a dejar listo el marco en unos minutos. Todo lo que pongas aquí se guarda <b>solo en este iPad</b>.</p>
+      ${navigator.standalone === false ? `<div class="tip">💡 Antes de seguir, añade esta página a la pantalla de inicio (botón Compartir → «Añadir a pantalla de inicio») y abre el asistente desde allí. En iPad, la app de la pantalla de inicio no comparte datos con Safari.</div>` : ''}
+      <div class="card"><label for="clave">Clave del marco</label>
+        <input id="clave" type="password" value="${esc(draft.clave || '')}" autocomplete="off" placeholder="La que pusiste en Vercel (MARCO_CLAVE)">
+        <p class="res">Es la clave que inventaste al desplegar en Vercel.</p></div>
+      <details><summary>¿Ya lo configuraste en otro iPad?</summary>
+        <div class="card"><label for="imp">Pega aquí el código de configuración</label><textarea id="imp"></textarea>
+        <button onclick="importCode()">Importar</button></div></details>`,
+    async read() {
+      draft.clave = val('clave');
+      if (!draft.clave) return 'Escribe la clave';
+      await proxy({}, draft.clave).catch(e => { throw new Error(e.message === 'Clave incorrecta' ? 'Esa clave no es la de Vercel' : e.message); });
+    } },
+  { // 2. Ubicación
+    title: '¿Dónde estáis?', html: () => `
+      <p>Para el tiempo y para saber qué gasolineras tenéis cerca.</p>
+      <div class="card"><button class="pri" onclick="geoHere()">📍 Usar la ubicación de este iPad</button>
+        <label for="city">O busca tu ciudad</label><div class="row"><div><input id="city" placeholder="Ej. Valladolid" onkeydown="if(event.key==='Enter')findCity()"></div><button onclick="findCity()">Buscar</button></div>
+        <div id="cities"></div>
+        <p class="res" id="here">${draft.lat ? `✅ ${esc(draft.place || 'Ubicación guardada')} (${draft.lat}, ${draft.lon})` : ''}</p></div>`,
+    read() { if (draft.lat == null) return 'Elige una ubicación'; } },
+  { // 3. Calendarios
+    title: 'Calendarios', html: () => `
+      <p>Un calendario de Google por persona (o uno común). Se leen con su <b>dirección secreta en formato iCal</b>: no hay que dar permisos a nadie.</p>
+      <details><summary>¿Dónde está esa dirección?</summary><ol>
+        <li>Abre <b>calendar.google.com</b> en un ordenador (en la app del iPad no aparece).</li>
+        <li>Pasa el ratón por el calendario en la lista de la izquierda → <b>⋮</b> → <b>Configuración y uso compartido</b>.</li>
+        <li>Baja hasta <b>Integrar el calendario</b> y copia la <b>Dirección secreta en formato iCal</b> (acaba en <code>basic.ics</code>).</li>
+        <li>Mándatela al iPad (por ejemplo, en una nota) y pégala aquí. Trátala como una contraseña.</li></ol>
+        <p>Los eventos nuevos pueden tardar unos minutos en aparecer: Google tarda en actualizar esa dirección.</p></details>
+      ${draft.cals.map((c, i) => `<div class="card"><div class="row">
+          <div><label>Nombre</label><input value="${esc(c.name)}" oninput="draft.cals[${i}].name=this.value"></div>
+          <input type="color" value="${esc(c.color)}" oninput="draft.cals[${i}].color=this.value" aria-label="Color">
+          <button class="rm-x" onclick="draft.cals.splice(${i},1);drawStep()" aria-label="Quitar">✕</button></div>
+        <label>Dirección secreta iCal</label><input value="${esc(c.url)}" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" oninput="draft.cals[${i}].url=this.value.trim()">
+        <button class="lnk" onclick="testCal(${i})">Probar</button><div class="res" id="cal${i}"></div></div>`).join('')}
+      <button onclick="draft.cals.push({name:'',color:PALETTE[draft.cals.length%PALETTE.length],url:''});drawStep()">+ Añadir calendario</button>`,
+    async read() {
+      draft.cals = draft.cals.filter(c => c.url || c.name);
+      for (const [i, c] of draft.cals.entries()) {
+        if (!c.name) return `Ponle nombre al calendario ${i + 1}`;
+        if (!/^(https|webcals?):\/\/calendar\.google\.com\/calendar\/ical\/.+\.ics$/i.test(c.url)) return `La dirección de «${c.name}» no parece la dirección iCal de Google`;
+      }
+      const names = draft.cals.map(c => c.name);
+      if (new Set(names).size !== names.length) return 'Dos calendarios no pueden llamarse igual';
+    } },
+  { // 4. Cuenta atrás
+    key: 'countdown', empty: () => ({ emoji: '🎂', title: '', date: '', since: ymd(new Date()) }),
+    title: 'Cuenta atrás', html: () => `
+      <p>Los días que faltan para algo especial: un cumpleaños, un viaje, que nazca un bebé…</p>
+      <div class="card">${enabledToggle('countdown', 'Mostrar cuenta atrás')}
+      ${draft.countdown ? `<div class="row"><div style="flex:0 0 90px"><label>Emoji</label><input id="cde" value="${esc(draft.countdown.emoji)}"></div>
+        <div><label>¿Para qué?</label><input id="cdt" value="${esc(draft.countdown.title)}" placeholder="el viaje a Asturias"></div></div>
+        <label>Fecha</label><input id="cdd" type="date" value="${esc(draft.countdown.date)}">` : ''}</div>`,
+    read() {
+      if (!draft.countdown) return;
+      const c = draft.countdown, date = val('cdd');
+      if (date !== c.date) c.since = ymd(new Date());                  // la barra empieza a contar hoy
+      Object.assign(c, { emoji: val('cde') || '🎉', title: val('cdt'), date });
+      if (!c.title || !c.date) return 'Pon qué es y la fecha';
+      if (c.date < ymd(new Date())) return 'La fecha ya ha pasado';
+    } },
+  { // 5. Fútbol
+    key: 'team', empty: () => ({ league: 'esp.1' }),
+    title: 'Fútbol', html: () => `
+      <p>El último resultado y los próximos partidos de vuestro equipo (liga, copa y Europa).</p>
+      <div class="card">${enabledToggle('team', 'Mostrar fútbol')}
+      ${draft.team ? `<label>Liga</label><select id="lg" onchange="draft.team={league:this.value};drawStep()">${Object.entries(LEAGUES).map(([k, v]) =>
+          `<option value="${k}" ${draft.team.league === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        <label>Equipo</label><select id="tm"><option>Cargando…</option></select>` : ''}</div>`,
+    async after() {
+      if (!draft.team) return;
+      const lg = draft.team.league;
+      teamsCache[lg] ||= await proxy({ equipos: lg }, draft.clave).then(l => l.sort((a, b) => a.name.localeCompare(b.name, 'es'))).catch(() => null);
+      if (!$('tm')) return;
+      $('tm').innerHTML = teamsCache[lg] ? '<option value="">Elige equipo</option>' + teamsCache[lg].map(t => `<option value="${esc(t.id)}" ${draft.team.id === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')
+        : '<option value="">No se pudo cargar la lista</option>';
+    },
+    read() {
+      if (!draft.team) return;
+      const t = (teamsCache[draft.team.league] || []).find(t => t.id === val('tm'));
+      if (!t) return 'Elige equipo';
+      draft.team = { league: draft.team.league, id: t.id, name: t.short || t.name, color: t.color, alt: t.alt };
+    } },
+  { // 6. Gasolina
+    key: 'gas', empty: () => ({ fuel: 'Precio Gasolina 95 E5', prov: '', ids: [] }),
+    title: 'Gasolina', html: () => `
+      <p>Precio de hoy en las gasolineras que elijáis (datos del Ministerio, solo España).</p>
+      <div class="card">${enabledToggle('gas', 'Mostrar gasolina')}
+      ${draft.gas ? `<label>Combustible</label><select id="fuel" onchange="draft.gas.fuel=this.value;gasList=null;drawStep()">${Object.entries(FUELS).map(([k, v]) =>
+          `<option value="${k}" ${draft.gas.fuel === k ? 'selected' : ''}>${cap(v.toLowerCase())}</option>`).join('')}</select>
+        <label>Código postal de casa</label><div class="row"><div><input id="cp" inputmode="numeric" maxlength="5" value="${esc(draft.gas.cp || '')}"></div><button onclick="findGas()">Buscar cerca</button></div>
+        <div id="gasl">${gasPicker()}</div>` : ''}</div>`,
+    read() {
+      if (!draft.gas) return;
+      if (!draft.gas.ids.length) return 'Elige al menos una gasolinera (o desactiva la tarjeta)';
+    } },
+  { // 7. Luz
+    key: 'luz', empty: () => ({ tarifa: 'pvpc', aparatos: DEFAULT_APPS.map(a => ({ ...a })) }),
+    title: 'Luz', html: () => `
+      <p>Cuándo es más barato poner la lavadora, el lavavajillas o cargar el coche.</p>
+      <div class="card">${enabledToggle('luz', 'Mostrar luz')}
+      ${draft.luz ? `<label>¿Qué tarifa tenéis?</label>
+        ${[['pvpc', 'Regulada (PVPC): el precio cambia cada hora'], ['tramos', 'Con tramos fijos: barata de 0 a 8 h y los fines de semana']].map(([k, v]) =>
+          `<label class="pick"><input type="radio" name="tar" value="${k}" ${draft.luz.tarifa === k ? 'checked' : ''} onchange="draft.luz.tarifa=this.value">${v}</label>`).join('')}
+        <p class="res">Si pagáis siempre lo mismo a cualquier hora, desactiva esta tarjeta: no os aporta nada.</p>
+        <h2>Aparatos</h2><p class="res">Las horas que suele durar cada uno: el marco busca el tramo seguido más barato.</p>
+        ${draft.luz.aparatos.map((a, i) => `<div class="row"><div style="flex:0 0 74px"><input value="${esc(a.emoji)}" oninput="draft.luz.aparatos[${i}].emoji=this.value" aria-label="Emoji"></div>
+          <div><input value="${esc(a.name)}" oninput="draft.luz.aparatos[${i}].name=this.value" aria-label="Nombre"></div>
+          <div style="flex:0 0 90px"><input type="number" min="1" max="12" value="${a.h}" oninput="draft.luz.aparatos[${i}].h=+this.value" aria-label="Horas"></div>
+          <button class="rm-x" onclick="draft.luz.aparatos.splice(${i},1);drawStep()" aria-label="Quitar">✕</button></div>`).join('<div style="height:8px"></div>')}
+        <p><button class="lnk" onclick="draft.luz.aparatos.push({emoji:'🔌',name:'',h:1});drawStep()">+ Añadir aparato</button></p>` : ''}</div>`,
+    read() {
+      if (!draft.luz) return;
+      draft.luz.aparatos = draft.luz.aparatos.filter(a => a.name.trim());
+      if (draft.luz.aparatos.some(a => !(a.h >= 1 && a.h <= 12))) return 'Las horas de cada aparato van de 1 a 12';
+    } },
+  { // 8. Talentos
+    key: 'talentos', empty: () => ({ code: '' }),
+    title: 'Talentos', html: () => `
+      <p>Los puntos de los niños de la app <b>Talentos</b>. Al tocar la tarjeta se abre el tablero completo.</p>
+      <div class="card">${enabledToggle('talentos', 'Mostrar Talentos')}
+      ${draft.talentos ? `<label>Enlace del tablero</label><input id="tab" value="${draft.talentos.code ? 'https://lostalentos.vercel.app/tablero/' + esc(draft.talentos.code) : ''}" placeholder="https://lostalentos.vercel.app/tablero/…">
+        <p class="res">En Talentos: Ajustes → Tablero → copiar enlace.</p>
+        <button class="lnk" onclick="testBoard()">Comprobar</button><div id="kidsp"></div>` : ''}</div>`,
+    async read() {
+      if (!draft.talentos) return;
+      const code = codigoTablero(val('tab'));
+      if (!code) return 'Pega el enlace del tablero';
+      await proxy({ tablero: code }, draft.clave);
+      draft.talentos.code = code;
+    } },
+  { // 9. Listo
+    title: '¡Listo! 🎉', html: () => `
+      <p>Así queda tu marco:</p>
+      <div class="card"><ul style="padding-left:20px">
+        <li>🌤️ Tiempo en ${esc(draft.place || 'tu zona')}</li>
+        <li>📅 ${draft.cals.length ? draft.cals.map(c => esc(c.name)).join(', ') : 'sin calendarios'}</li>
+        ${draft.countdown ? `<li>${esc(draft.countdown.emoji)} Cuenta atrás: ${esc(draft.countdown.title)}</li>` : ''}
+        ${draft.team ? `<li>⚽ ${esc(draft.team.name)}</li>` : ''}
+        ${draft.gas ? `<li>⛽ ${draft.gas.ids.length} gasolinera${draft.gas.ids.length > 1 ? 's' : ''}</li>` : ''}
+        ${draft.luz ? `<li>⚡ Luz (${draft.luz.tarifa === 'pvpc' ? 'PVPC' : 'tramos'})</li>` : ''}
+        ${draft.talentos ? '<li>⭐ Talentos</li>' : ''}</ul></div>
+      <details><summary>Configurar otro iPad igual</summary><div class="card">
+        <p>Copia este código y pégalo en el asistente del otro iPad. Lleva la clave y los calendarios: trátalo como una contraseña.</p>
+        <textarea id="code" readonly>${codificar(draft)}</textarea><button onclick="navigator.clipboard.writeText($('code').value).then(()=>say('Copiado',1))">Copiar</button></div></details>
+      <p class="res">Para cambiar algo más adelante, toca ⚙︎ abajo a la derecha del marco.</p>`,
+    read() {} },
+];
+
+function drawStep() {
+  const s = STEPS[stepIdx], last = stepIdx === STEPS.length - 1;
+  $('setup').firstElementChild.innerHTML = `<div class="steps">${STEPS.map((_, i) => `<i class="${i <= stepIdx ? 'on' : ''}"></i>`).join('')}</div>
+    <h1>${s.title}</h1>${s.html()}
+    <div class="err" id="serr"></div>
+    <div class="nav">${stepIdx ? '<button onclick="go(-1)">Atrás</button>' : cfg ? '<button onclick="$(\'setup\').hidden=true">Cancelar</button>' : '<span></span>'}
+      <button class="pri" id="nextb" onclick="go(1)">${last ? 'Guardar y empezar' : 'Siguiente'}</button></div>`;
+  $('setup').scrollTop = 0;
+  s.after?.();
+}
+async function go(dir) {
+  if (dir < 0) { stepIdx--; return drawStep(); }
+  const b = $('nextb'); b.disabled = true; say('');
+  let err;
+  try { err = await STEPS[stepIdx].read(); } catch (e) { err = e.message; }
+  b.disabled = false;
+  if (err) return say(err);
+  if (stepIdx < STEPS.length - 1) { stepIdx++; return drawStep(); }
+  store.set('marco_cfg', JSON.stringify(draft));
+  if (store.get('marco_cfg') !== JSON.stringify(draft)) return say('No se pudo guardar en este iPad (¿navegación privada?)');
+  location.reload();
+}
+function importCode() {
+  const c = decodificar(val('imp'));
+  if (!c?.clave) return say('Ese código no es válido');
+  draft = c; stepIdx = STEPS.length - 1; drawStep();
+}
+// Ubicación: la del iPad (redondeada a ~1 km, de sobra para el tiempo) o la de una ciudad buscada
+function setPlace(lat, lon, place) {
+  Object.assign(draft, { lat: +(+lat).toFixed(2), lon: +(+lon).toFixed(2), place });
+  $('here').textContent = `✅ ${place} (${draft.lat}, ${draft.lon})`; $('cities').innerHTML = ''; say('');
+}
+function geoHere() {
+  if (!navigator.geolocation) return say('Este navegador no da la ubicación: busca la ciudad');
+  say('Buscando…', 1);
+  navigator.geolocation.getCurrentPosition(p => {
+    const { latitude: la, longitude: lo } = p.coords;
+    setPlace(la, lo, draft.place && Math.abs(draft.lat - la) < .05 ? draft.place : 'Ubicación del iPad');
+  }, e => say(e.code === 1 ? 'Sin permiso para la ubicación: busca la ciudad' : 'No se pudo saber la ubicación: busca la ciudad'), { timeout: 15000 });
+}
+async function findCity() {
+  const q = val('city'); if (!q) return;
+  const j = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=es`).then(r => r.json()).catch(() => ({}));
+  window._cities = j.results || [];
+  $('cities').innerHTML = _cities.length ? _cities.map((c, i) => `<label class="pick" onclick="setPlace(_cities[${i}].latitude,_cities[${i}].longitude,_cities[${i}].name)">📍 <span>${esc(c.name)}<small>${esc([c.admin2, c.admin1, c.country].filter(Boolean).join(', '))}</small></span></label>`).join('')
+    : '<p class="res">No se encontró. Prueba con otro nombre.</p>';
+}
+async function testCal(i) {
+  const c = draft.cals[i], out = $('cal' + i);
+  out.textContent = 'Leyendo…';
+  try {
+    const j = await proxy({ cal: c.url, desde: new Date().toISOString(), hasta: addDays(new Date(), 30).toISOString() }, draft.clave);
+    if (!c.name && j.name) { c.name = j.name; drawStep(); return testCal(i); }
+    out.innerHTML = `<span class="ok">✓ ${esc(j.name || 'Funciona')}</span> · ${j.events.length ? 'próximos: ' + j.events.slice(0, 3).map(e => esc(e.title)).join(', ') : 'sin eventos en los próximos 30 días'}`;
+  } catch (e) { out.innerHTML = `<span style="color:var(--accent)">✗ ${esc(e.message)}</span>`; }
+}
+async function findGas() {
+  const cp = val('cp');
+  if (!/^\d{5}$/.test(cp)) return say('Escribe el código postal (5 cifras)');
+  draft.gas.cp = cp; draft.gas.prov = cp.slice(0, 2); say('Buscando gasolineras…', 1);
+  try { gasList = (await provincia(draft.gas.prov, draft.gas.fuel, draft.lat, draft.lon)).sort((a, b) => a.d - b.d).slice(0, 15); say(''); }
+  catch (e) { return say('No se pudo leer la lista del Ministerio: ' + e.message); }
+  $('gasl').innerHTML = gasPicker();
+}
+function gasPicker() {
+  if (!gasList) return draft.gas.ids.length ? `<p class="res">${draft.gas.ids.length} elegidas. Pulsa «Buscar cerca» para cambiarlas.</p>` : '';
+  return `<p class="res">Elige hasta 5 (las más cercanas a vuestra ubicación):</p>` + gasList.map(e => `<label class="pick">
+    <input type="checkbox" ${draft.gas.ids.includes(e.id) ? 'checked' : ''} onchange="pickGas('${e.id}', this)">
+    <span>${esc(e.name)}<small>${esc(e.addr)} · ${esc(e.town)} · ${e.d.toFixed(1).replace('.', ',')} km</small></span><b>${e.p.toFixed(3).replace('.', ',')} €</b></label>`).join('');
+}
+function pickGas(id, box) {
+  const ids = draft.gas.ids;
+  if (box.checked && ids.length >= 5) { box.checked = false; return say('Como mucho 5'); }
+  draft.gas.ids = box.checked ? [...ids, id] : ids.filter(x => x !== id); say('');
+}
+async function testBoard() {
+  const code = codigoTablero(val('tab')), out = $('kidsp');
+  if (!code) return say('Pega el enlace del tablero');
+  out.innerHTML = '<p class="res">Leyendo…</p>';
+  try {
+    const j = await proxy({ tablero: code }, draft.clave);
+    out.innerHTML = `<p class="res"><span class="ok">✓ ${esc(j.family || 'Tablero encontrado')}</span></p><div class="kidsprev">${(j.kids || []).map((k, i) => {
+      const c = /^#[0-9a-f]{6}$/i.test(k.color) ? k.color : KID_COLORS[i % 4];
+      return `<span style="background:${c}22;color:${c}">${esc(k.avatar || '⭐')} ${esc(k.name)} · ${fmtPts(k.balance)} ⭐</span>`; }).join('')}</div>`;
+  } catch (e) { out.innerHTML = `<p class="res" style="color:var(--accent)">✗ ${esc(e.message)}</p>`; }
+}
+
+if (cfg?.clave && cfg.lat != null) start(); else { fit(); openSetup(); }
+</script>
+</body>
+</html>

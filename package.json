@@ -1,0 +1,11 @@
+{
+  "name": "marco-familiar-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test/calendario.test.js && node test/logica.test.js"
+  },
+  "dependencies": {
+    "ical.js": "2.2.1"
+  }
+}
