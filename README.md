@@ -4,21 +4,28 @@ A family dashboard for an iPad hung on the wall or sitting on the kitchen counte
 
 It needs no server at home or Home Assistant: it runs on a free Vercel account, and the first time you open it a setup wizard asks for everything it needs.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmanueldiezb%2Fmarco-familiar-web&project-name=marco-familiar&repository-name=marco-familiar)
-
 ## Setting it up
 
-1. **Click "Deploy with Vercel"** (above). Vercel makes a copy of the repo in your GitHub and deploys it; there's nothing to fill in.
-2. When it's done, Vercel gives you an address like `https://marco-familiar-xxxx.vercel.app`. **Open it on your computer** and follow the wizard. It takes a few minutes:
+1. **Fork this repo**: [github.com/manueldiezb/marco-familiar-web/fork](https://github.com/manueldiezb/marco-familiar-web/fork) → "Create fork". A fork (not a copy) is what lets you get updates later.
+2. **Publish it on Vercel**: [vercel.com/new](https://vercel.com/new) → import your fork → "Deploy". There's nothing to fill in.
+3. When it's done, Vercel gives you an address like `https://marco-familiar-xxxx.vercel.app`. **Open it on your computer** and follow the wizard. It takes a few minutes:
    - Location: for the weather and the nearby petrol stations.
    - Google calendars (see below).
    - Optional cards: countdown, football, petrol, electricity and Talentos.
-3. The last step shows a **QR code**. Scan it with the iPad's camera (or send yourself the link) and open it in Safari.
-4. On the iPad: Share → **"Add to Home Screen"**, and open it from there. It runs full screen, with no Safari bars.
-5. On the iPad: **Settings → Display & Brightness → Auto-Lock → Never**, and leave it on charge.
+4. The last step shows a **QR code**. Scan it with the iPad's camera (or send yourself the link) and open it in Safari.
+5. On the iPad: Share → **"Add to Home Screen"**, and open it from there. It runs full screen, with no Safari bars.
+6. On the iPad: **Settings → Display & Brightness → Auto-Lock → Never**, and leave it on charge.
 
-To change something later, tap **⚙︎** in the bottom-right corner.
-To set up a second iPad, open the same link (⚙︎ → last step shows the QR again).
+To change something later, tap **⚙︎** in the bottom-right corner: each card has its own section.
+To set up a second iPad, open the same link (⚙︎ → "Abrir en otro iPad" shows the QR again).
+
+### Updates
+
+⚙︎ → **Actualizaciones** compares your fork with this repo and lists what's new. To install it, open your fork on GitHub and click **"Sync fork" → "Update branch"**; Vercel republishes it and the iPad reloads by itself within a few minutes.
+
+To do it from the frame with one tap instead, give it a GitHub token:
+1. GitHub → Settings → Developer settings → Fine-grained tokens → **Generate new token**, with access only to your fork and **Contents: Read and write**.
+2. Vercel → your project → Settings → Environment Variables → add **`GITHUB_TOKEN`** with that token, and redeploy.
 
 ### Google Calendar's secret address
 
@@ -46,7 +53,7 @@ New events can take a few minutes to show up, because Google takes a while to up
 ## Privacy
 
 - **Settings travel inside the link** (after `#`, a part browsers never send to the server) and are kept in the browser's local storage: calendar addresses and location (rounded to ~1 km). They are never written to the repo or to Vercel. The link contains your calendar addresses, so share it only with your family.
-- The only server-side function, `api/proxy.js`, reads the calendars and the Talentos board on the iPad's behalf, because browsers don't allow reading them directly. It only talks to Google Calendar, Talentos and ESPN and stores nothing, so it doesn't need a password: anyone using it can only read what they already have the address or code for.
+- The only server-side function, `api/proxy.js`, reads the calendars and the Talentos board on the iPad's behalf, because browsers don't allow reading them directly. It only talks to Google Calendar, Talentos, ESPN and (to update) GitHub, and stores nothing, so it doesn't need a password: anyone using it can only read what they already have the address or code for.
 
 ## Development
 

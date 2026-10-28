@@ -295,6 +295,10 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 #setup .pick input { width: 22px; height: 22px; flex: none; }
 #setup .pick small { color: var(--soft); display: block; }
 #setup .pick b { margin-left: auto; font-variant-numeric: tabular-nums; }
+#setup button.menu { width: 100%; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; text-align: left; padding: 14px 4px; display: flex; flex-wrap: wrap; column-gap: 12px; }
+#setup button.menu:last-child { border-bottom: 0; }
+#setup button.menu small { order: 3; width: 100%; font-weight: 400; font-size: 15px; }
+#setup button.menu b { color: var(--muted); font-size: 22px; line-height: 1; }
 #setup details { margin: 10px 0; } #setup summary { cursor: pointer; font-weight: 600; color: var(--accent); }
 #setup ol { padding-left: 22px; color: var(--soft); } #setup li { margin: 4px 0; }
 #setup .res { font-size: 15px; margin-top: 8px; color: var(--soft); }
@@ -992,15 +996,70 @@ const val = id => $(id)?.value.trim() ?? '';
 const say = (msg, ok) => { const e = $('serr'); if (e) { e.className = ok ? 'err ok' : 'err'; e.textContent = msg || ''; } };
 function openSetup() {
   draft = JSON.parse(JSON.stringify(cfg || { cals: [{ name: 'Familia', color: PALETTE[2], url: '' }] }));
-  stepIdx = 0; $('setup').hidden = false; drawStep();
+  stepIdx = 0; $('setup').hidden = false;
+  if (cfg) drawMenu(); else drawStep();
+}
+// --- Ajustes (con el marco ya configurado): un apartado por tarjeta; se edita uno y se guarda ---
+let editing = false;
+function resumen(i) {
+  const d = draft, off = 'Desactivada';
+  return [esc(d.place || ''), d.cals.length ? d.cals.map(c => esc(c.name)).join(', ') : 'Sin calendarios',
+    d.countdown ? esc(d.countdown.title) : off, d.team ? esc(d.team.name) : off,
+    d.gas ? `${d.gas.ids.length} gasolinera${d.gas.ids.length > 1 ? 's' : ''}` : off,
+    d.luz ? (d.luz.tarifa === 'pvpc' ? 'PVPC' : 'Tramos') : off, d.talentos ? 'Activada' : off, 'Código QR y enlace'][i];
+}
+function drawMenu() {
+  editing = false;
+  $('setup').firstElementChild.innerHTML = `<h1>Ajustes</h1>
+    <div class="card" style="padding:4px 18px">${STEPS.map((s, i) => `<button class="pick menu" onclick="editStep(${i})">${s.name}<small>${resumen(i)}</small><b>›</b></button>`).join('')}</div>
+    <h2>🔄 Actualizaciones</h2><div class="card" id="upd"><p class="res">Comprobando…</p></div>
+    <div class="err" id="serr"></div>
+    <div class="nav"><button class="pri" onclick="$('setup').hidden=true">Cerrar</button></div>`;
+  $('setup').scrollTop = 0;
+  checkVersion();
+}
+function editStep(i) { editing = true; stepIdx = i; drawStep(); }
+function cancelEdit() { draft = JSON.parse(JSON.stringify(cfg)); drawMenu(); }
+
+// --- Actualizaciones: compara lo publicado con el repo original; «Actualizar» hace el Sync Fork ---
+const ORIGINAL = 'manueldiezb/marco-familiar-web';
+let ver = null;
+async function checkVersion() {
+  const put = h => { if ($('upd')) $('upd').innerHTML = h; };
+  try {
+    ver = ver || await proxy({ version: 1 });
+    if (!ver.sha) return put('<p class="res">Solo se puede comprobar cuando está publicado en Vercel desde GitHub.</p>');
+    if (`${ver.owner}/${ver.repo}`.toLowerCase() === ORIGINAL) return put(`<p class="res">Este es el marco original (versión ${ver.sha.slice(0, 7)}).</p>`);
+    const r = await fetch(`https://api.github.com/repos/${ver.owner}/${ver.repo}/compare/${ver.sha}...${ORIGINAL.split('/')[0]}:main`);
+    if (!r.ok) throw new Error(r.status === 403 ? 'GitHub pide esperar un rato' : 'GitHub respondió ' + r.status);
+    const c = await r.json();
+    if (!c.ahead_by) return put('<p class="ok">✓ Tienes la última versión.</p>');
+    const news = c.commits.slice(-8).reverse().map(x => `<li>${esc(x.commit.message.split('\n')[0])}</li>`).join('');
+    put(`<p><b>Hay ${c.ahead_by} novedad${c.ahead_by > 1 ? 'es' : ''}:</b></p><ul style="padding-left:20px">${news}</ul>
+      ${ver.token ? '<button class="pri" id="syncb" onclick="syncFork()">Actualizar ahora</button>'
+        : `<p>Para instalarlas, abre tu copia en GitHub y pulsa <b>«Sync fork» → «Update branch»</b>. Vercel la publica solo y el marco se recarga en unos minutos.</p>
+           <button class="pri" onclick="open('https://github.com/${esc(ver.owner)}/${esc(ver.repo)}','_blank')">Abrir GitHub</button>
+           <details><summary>Actualizar desde aquí con un clic</summary><ol>
+             <li>En GitHub: Settings → Developer settings → Fine-grained tokens → <b>Generate new token</b>.</li>
+             <li>Repository access: solo <b>${esc(ver.repo)}</b>. Permissions → <b>Contents: Read and write</b>.</li>
+             <li>En Vercel: tu proyecto → Settings → Environment Variables → añade <b>GITHUB_TOKEN</b> con ese token y vuelve a desplegar.</li></ol></details>`}`);
+  } catch (e) { put(`<p class="res">No se pudo comprobar: ${esc(e.message)}</p>`); }
+}
+async function syncFork() {
+  const b = $('syncb'); b.disabled = true; b.textContent = 'Actualizando…';
+  try {
+    const r = await fetch('/api/proxy?actualizar=1', { method: 'POST' }), j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'servidor ' + r.status);
+    $('upd').innerHTML = '<p class="ok">✓ Hecho. Vercel está publicando la versión nueva; el marco se recargará solo en unos minutos.</p>';
+  } catch (e) { b.disabled = false; b.textContent = 'Actualizar ahora'; say(e.message); }
 }
 const enabledToggle = (key, label) => `<label class="tog"><input type="checkbox" id="on" ${draft[key] ? 'checked' : ''} onchange="toggleCard('${key}', this.checked)"> ${label}</label>`;
 function toggleCard(key, on) { if (on) draft[key] = draft[key] || STEPS.find(s => s.key === key).empty(); else delete draft[key]; drawStep(); }
 
 const STEPS = [
   { // 1. Bienvenida y ubicación
-    title: 'Hola 👋', html: () => `
-      <p>Vamos a dejar listo el marco en unos minutos. Mejor desde el ordenador: al final te doy un código QR para abrirlo en el iPad.</p>
+    title: 'Hola 👋', name: '📍 Ubicación', html: () => `
+      ${cfg ? '' : '<p>Vamos a dejar listo el marco en unos minutos. Mejor desde el ordenador: al final te doy un código QR para abrirlo en el iPad.</p>'}
       <h2>¿Dónde estáis?</h2><p>Para el tiempo y para saber qué gasolineras tenéis cerca.</p>
       <div class="card"><button class="pri" onclick="geoHere()">📍 Usar mi ubicación</button>
         <label for="city">O busca tu ciudad</label><div class="row"><div><input id="city" placeholder="Ej. Valladolid" onkeydown="if(event.key==='Enter')findCity()"></div><button onclick="findCity()">Buscar</button></div>
@@ -1008,7 +1067,7 @@ const STEPS = [
         <p class="res" id="here">${draft.lat ? `✅ ${esc(draft.place || 'Ubicación guardada')} (${draft.lat}, ${draft.lon})` : ''}</p></div>`,
     read() { if (draft.lat == null) return 'Elige una ubicación'; } },
   { // 3. Calendarios
-    title: 'Calendarios', html: () => `
+    title: 'Calendarios', name: '📅 Calendarios', html: () => `
       <p>Un calendario de Google por persona (o uno común). Se leen con su <b>dirección secreta en formato iCal</b>: no hay que dar permisos a nadie.</p>
       <details><summary>¿Dónde está esa dirección?</summary><ol>
         <li>Abre <b>calendar.google.com</b> en un ordenador (en la app del iPad no aparece).</li>
@@ -1034,7 +1093,7 @@ const STEPS = [
     } },
   { // 4. Cuenta atrás
     key: 'countdown', empty: () => ({ emoji: '🎂', title: '', date: '', since: ymd(new Date()) }),
-    title: 'Cuenta atrás', html: () => `
+    title: 'Cuenta atrás', name: '⏳ Cuenta atrás', html: () => `
       <p>Los días que faltan para algo especial: un cumpleaños, un viaje, que nazca un bebé…</p>
       <div class="card">${enabledToggle('countdown', 'Mostrar cuenta atrás')}
       ${draft.countdown ? `<div class="row"><div style="flex:0 0 90px"><label>Emoji</label><input id="cde" value="${esc(draft.countdown.emoji)}"></div>
@@ -1050,7 +1109,7 @@ const STEPS = [
     } },
   { // 5. Fútbol
     key: 'team', empty: () => ({ league: 'esp.1' }),
-    title: 'Fútbol', html: () => `
+    title: 'Fútbol', name: '⚽ Fútbol', html: () => `
       <p>El último resultado y los próximos partidos de vuestro equipo (liga, copa y Europa).</p>
       <div class="card">${enabledToggle('team', 'Mostrar fútbol')}
       ${draft.team ? `<label>Liga</label><select id="lg" onchange="draft.team={league:this.value};drawStep()">${Object.entries(LEAGUES).map(([k, v]) =>
@@ -1072,7 +1131,7 @@ const STEPS = [
     } },
   { // 6. Gasolina
     key: 'gas', empty: () => ({ fuel: 'Precio Gasolina 95 E5', prov: '', ids: [] }),
-    title: 'Gasolina', html: () => `
+    title: 'Gasolina', name: '⛽ Gasolina', html: () => `
       <p>Precio de hoy en las gasolineras que elijáis (datos del Ministerio, solo España).</p>
       <div class="card">${enabledToggle('gas', 'Mostrar gasolina')}
       ${draft.gas ? `<label>Combustible</label><select id="fuel" onchange="draft.gas.fuel=this.value;gasList=null;drawStep()">${Object.entries(FUELS).map(([k, v]) =>
@@ -1085,7 +1144,7 @@ const STEPS = [
     } },
   { // 7. Luz
     key: 'luz', empty: () => ({ tarifa: 'pvpc', aparatos: DEFAULT_APPS.map(a => ({ ...a })) }),
-    title: 'Luz', html: () => `
+    title: 'Luz', name: '⚡ Luz', html: () => `
       <p>Cuándo es más barato poner la lavadora, el lavavajillas o cargar el coche.</p>
       <div class="card">${enabledToggle('luz', 'Mostrar luz')}
       ${draft.luz ? `<label>¿Qué tarifa tenéis?</label>
@@ -1105,7 +1164,7 @@ const STEPS = [
     } },
   { // 8. Talentos
     key: 'talentos', empty: () => ({ code: '' }),
-    title: 'Talentos', html: () => `
+    title: 'Talentos', name: '⭐ Talentos', html: () => `
       <p>Los puntos de los niños de la app <b>Talentos</b>. Al tocar la tarjeta se abre el tablero completo.</p>
       <div class="card">${enabledToggle('talentos', 'Mostrar Talentos')}
       ${draft.talentos ? `<label>Enlace del tablero</label><input id="tab" value="${draft.talentos.code ? 'https://lostalentos.vercel.app/tablero/' + esc(draft.talentos.code) : ''}" placeholder="https://lostalentos.vercel.app/tablero/…">
@@ -1119,7 +1178,7 @@ const STEPS = [
       draft.talentos.code = code;
     } },
   { // 9. Listo
-    title: '¡Listo! 🎉', html: () => `
+    title: '¡Listo! 🎉', name: '📱 Abrir en otro iPad', html: () => `
       <p>Así queda tu marco:</p>
       <div class="card"><ul style="padding-left:20px">
         <li>🌤️ Tiempo en ${esc(draft.place || 'tu zona')}</li>
@@ -1140,11 +1199,14 @@ const STEPS = [
 
 function drawStep() {
   const s = STEPS[stepIdx], last = stepIdx === STEPS.length - 1;
-  $('setup').firstElementChild.innerHTML = `<div class="steps">${STEPS.map((_, i) => `<i class="${i <= stepIdx ? 'on' : ''}"></i>`).join('')}</div>
-    <h1>${s.title}</h1>${s.html()}
+  const nav = editing ? (last ? '<button onclick="drawMenu()">Volver</button>'
+      : '<button onclick="cancelEdit()">Cancelar</button><button class="pri" id="nextb" onclick="go(1)">Guardar</button>')
+    : `${stepIdx ? '<button onclick="go(-1)">Atrás</button>' : '<span></span>'}
+      <button class="pri" id="nextb" onclick="go(1)">${last ? 'Guardar y empezar' : 'Siguiente'}</button>`;
+  $('setup').firstElementChild.innerHTML = `${editing ? '' : `<div class="steps">${STEPS.map((_, i) => `<i class="${i <= stepIdx ? 'on' : ''}"></i>`).join('')}</div>`}
+    <h1>${editing ? s.name : s.title}</h1>${s.html()}
     <div class="err" id="serr"></div>
-    <div class="nav">${stepIdx ? '<button onclick="go(-1)">Atrás</button>' : cfg ? '<button onclick="$(\'setup\').hidden=true">Cancelar</button>' : '<span></span>'}
-      <button class="pri" id="nextb" onclick="go(1)">${last ? 'Guardar y empezar' : 'Siguiente'}</button></div>`;
+    <div class="nav">${nav}</div>`;
   $('setup').scrollTop = 0;
   s.after?.();
 }
@@ -1155,7 +1217,7 @@ async function go(dir) {
   try { err = await STEPS[stepIdx].read(); } catch (e) { err = e.message; }
   b.disabled = false;
   if (err) return say(err);
-  if (stepIdx < STEPS.length - 1) { stepIdx++; return drawStep(); }
+  if (!editing && stepIdx < STEPS.length - 1) { stepIdx++; return drawStep(); }
   const code = codificar(draft);
   store.set('marco_cfg', JSON.stringify(draft)); store.set('marco_imp', code);
   if (store.get('marco_cfg') !== JSON.stringify(draft)) return say('No se pudo guardar (¿navegación privada?)');
